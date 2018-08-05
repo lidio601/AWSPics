@@ -1,164 +1,217 @@
-var AWS = require("aws-sdk");
-var s3 = new AWS.S3();
-var cloudfront = new AWS.CloudFront();
-
-var async = require('async');
-var fs = require('fs');
-var mime = require('mime');
-var path = require('path');
-var yaml = require('js-yaml');
-
-var walk = function(dir, done) {
-  var results = [];
-  fs.readdir(dir, function(err, list) {
-    if (err) return done(err);
-    var pending = list.length;
-    if (!pending) return done(null, results);
-    list.forEach(function(file) {
-      file = path.resolve(dir, file);
-      fs.stat(file, function(err, stat) {
-        if (stat && stat.isDirectory()) {
-          walk(file, function(err, res) {
-            results = results.concat(res);
-            if (!--pending) done(null, results);
-          });
-        } else {
-          results.push(file);
-          if (!--pending) done(null, results);
-        }
-      });
-    });
-  });
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-
-function stripPrefix(object) {
-  return object.Key.replace('pics/original/', '');
-}
-
-function folderName(path) {
-  return path.split('/')[0];
-}
-
-function getAlbums(data) {
-  var objects = data.Contents.sort(function(a,b){
-    return b.LastModified - a.LastModified;
-  }).map(stripPrefix);
-  var albums = objects.map(folderName);
-  // Deduplicate albums
-  albums = albums.filter(function(item, pos) {
-    return albums.indexOf(item) == pos;
-  });
-
-  var pictures = albums.map(function(album){
-    return objects.filter(function(object){
-      return object.startsWith(album + "/") && object.endsWith('.jpg');
-    });
-  });
-
-  return {albums: albums, pictures: pictures};
-}
-
-function uploadHomepageSite(albums, pictures, metadata) {
-  var dir = 'homepage';
-  walk(dir, function(err, files) {
-    if (err) throw err;
-
-    async.map(files, function(f, cb) {
-      var body = fs.readFileSync(f);
-
-      if (path.basename(f) == 'error.html') {
-        body = body.toString().replace(/\{website\}/g, process.env.WEBSITE);
-      } else if (path.basename(f) == 'index.html') {
-        var picturesHTML = '';
-        for (var i = 0; i < albums.length; i++) {
-          var albumTitle = albums[i];
-          if (metadata[i] && metadata[i].title) {
-            albumTitle = metadata[i].title;
-          }
-          picturesHTML += "\t\t\t\t\t\t<article class=\"thumb\">\n" +
-                          "\t\t\t\t\t\t\t<a href=\"" + albums[i] + "/index.html\" class=\"image\"><img src=\"/pics/resized/1200x750/" + pictures[i][0] + "\" alt=\"\" /></a>\n" +
-                          "\t\t\t\t\t\t\t<h2>" + albumTitle + "</h2>\n" +
-                          "\t\t\t\t\t\t</article>\n";
+Object.defineProperty(exports, "__esModule", { value: true });
+const aws_sdk_1 = __importDefault(require("aws-sdk"));
+const async_1 = __importDefault(require("async"));
+const fs_1 = __importDefault(require("fs"));
+const mime_1 = __importDefault(require("mime"));
+const path_1 = __importDefault(require("path"));
+const js_yaml_1 = __importDefault(require("js-yaml"));
+const lodash_1 = __importDefault(require("lodash"));
+const bucketName = process.env.ORIGINAL_BUCKET || "";
+const s3 = new aws_sdk_1.default.S3();
+const cloudfront = new aws_sdk_1.default.CloudFront();
+const walk = (dir, done) => {
+    let results = [];
+    fs_1.default.readdir(dir, (err, list) => {
+        if (err) {
+            return done(err, []);
         }
-        body = body.toString().replace(/\{title\}/g, process.env.WEBSITE_TITLE)
-                              .replace(/\{pictures\}/g, picturesHTML);
-      }
-
-      var options = {
-        Bucket: process.env.SITE_BUCKET,
-        Key: path.relative(dir, f),
-        Body: body,
-        ContentType: mime.lookup(path.extname(f))
-      };
-
-      s3.putObject(options, cb);
-    }, function(err, results) {
-      if (err) console.log(err, err.stack);
+        let pending = list.length;
+        if (!pending) {
+            return done(null, results);
+        }
+        list.forEach((file) => {
+            file = path_1.default.resolve(dir, file);
+            fs_1.default.stat(file, (err1, stat) => {
+                if (stat && stat.isDirectory()) {
+                    walk(file, (err2, res) => {
+                        if (err2) {
+                            return done(err2, []);
+                        }
+                        results = results.concat(res);
+                        if (!--pending) {
+                            done(null, results);
+                        }
+                    });
+                }
+                else {
+                    results.push(file);
+                    if (!--pending) {
+                        done(null, results);
+                    }
+                }
+            });
+        });
     });
-  });
-}
+};
+const stripPrefix = (path1) => lodash_1.default.replace(path1, "pics/original/", "");
+const isFile = (path1) => !lodash_1.default.isEmpty(path_1.default.extname(path1));
+const folderName = (path1) => isFile(path1) ? path_1.default.dirname(path1) : path1;
+const lm = (a) => lodash_1.default.get(a, "LastModified");
+const getAlbums = (images) => {
+    const result = {};
+    //    images = images.sort((a: object, b: object): number => lm(b) - lm(a));
+    let image;
+    let album;
+    lodash_1.default.each(images, (data) => {
+        const imagePath = lodash_1.default.get(data, "Key", "");
+        image = {
+            id: stripPrefix(imagePath),
+            mime: mime_1.default.getType(imagePath),
+            name: path_1.default.basename(imagePath),
+            path: imagePath,
+        };
+        const albumPath = path_1.default.dirname(imagePath);
+        const albumId = stripPrefix(albumPath);
+        if (!lodash_1.default.has(result, albumId)) {
+            album = {
+                id: albumId,
+                metadata: null,
+                name: path_1.default.basename(albumPath),
+                path: albumPath,
+                pictures: [],
+            };
+            result[albumId] = album;
+        }
+        else {
+            album = lodash_1.default.get(result, albumId);
+        }
+        album.pictures = lodash_1.default.uniqBy(lodash_1.default.concat(album.pictures, [image]), "id");
+    });
+    return result;
+};
+const getAlbumMetadata = (album, cb) => {
+    s3.getObject({
+        Bucket: bucketName,
+        Key: album.path + "/metadata.yml",
+    }, (err, data) => {
+        if (err) {
+            // ignore if missing
+            cb(null, null);
+        }
+        else {
+            try {
+                const doc = js_yaml_1.default.safeLoad(lodash_1.default.toString(lodash_1.default.get(data, "Body")));
+                cb(null, doc);
+            }
+            catch (err) {
+                // ignore if error while parsing
+                cb(null, null);
+            }
+        }
+    });
+};
+const uploadHomepageSite = (albums) => {
+    const tmplDir = "homepage";
+    walk(tmplDir, (err, files) => {
+        if (err) {
+            throw err;
+        }
+        async_1.default.map(files, (f, cb) => {
+            let body = fs_1.default.readFileSync(f).toString("UTF-8");
+            if (path_1.default.basename(f) === "error.html") {
+                body = body.replace(/\{website\}/g, process.env.WEBSITE || "");
+            }
+            else if (path_1.default.basename(f) === "index.html") {
+                let picturesHTML = "";
+                lodash_1.default.each(albums, (album) => {
+                    const albumTitle = lodash_1.default.get(album.metadata, "title", album.name);
+                    const thumbnail = lodash_1.default.get(album.pictures, [0, "name"]);
+                    picturesHTML += "<article class=\"thumb\">" +
+                        "<a href=\"" + album.id + "/index.html\" class=\"image\">" +
+                        "<img src=\"/pics/resized/1200x750/" + thumbnail + "\" alt=\"\" /></a>" +
+                        "<h2>" + albumTitle + "</h2>" +
+                        "</article>";
+                });
+                body = body
+                    .replace(/\{title\}/g, process.env.WEBSITE_TITLE || "")
+                    .replace(/\{pictures\}/g, picturesHTML);
+            }
+            const options = {
+                Body: body,
+                Bucket: process.env.SITE_BUCKET || "",
+                ContentType: mime_1.default.getType(path_1.default.extname(f)) || undefined,
+                // ContentType: mime.lookup(path.extname(f))
+                Key: path_1.default.relative(tmplDir, f),
+            };
+            console.log("Uploading file", options.Key);
+            s3.putObject(options, cb);
+        }, (err1, results) => {
+            if (err1) {
+                console.log(err1, err1.stack);
+            }
+        });
+    });
+};
+/*
 
-function uploadAlbumSite(title, pictures, metadata) {
-  var dir = 'album';
-  walk(dir, function(err, files) {
-    if (err) throw err;
 
-    async.map(files, function(f, cb) {
-      var body = fs.readFileSync(f);
+
+
+function uploadAlbumSite (title, pictures, metadata) {
+  var dir = 'album'
+  walk(dir, function (err, files) {
+    if (err) throw err
+
+    async.map(files, function (f, cb) {
+      var body = fs.readFileSync(f)
 
       if (path.basename(f) == 'index.html') {
         // Defaults
         var renderedTitle = title,
-            comment1 = '';
-            comment2 = '';
+          comment1 = ''
+        comment2 = ''
 
         // Metadata
         if (metadata) {
-          if (metadata.title) renderedTitle = metadata.title;
-          if (metadata.comment1) comment1 = metadata.comment1;
-          if (metadata.comment2) comment2 = metadata.comment2;
+          if (metadata.title) renderedTitle = metadata.title
+          if (metadata.comment1) comment1 = metadata.comment1
+          if (metadata.comment2) comment2 = metadata.comment2
         }
 
         // Pictures
-        var picturesHTML = '';
+        var picturesHTML = ''
         for (var i = pictures.length - 1; i >= 0; i--) {
-          picturesHTML += "\t\t\t\t\t\t<article>\n" +
-                          "\t\t\t\t\t\t\t<a class=\"thumbnail\" href=\"/pics/resized/1200x750/" + pictures[i] + "\" data-position=\"center\"><img class=\"lazy\" src=\"assets/css/images/placeholder.png\" data-original=\"/pics/resized/360x225/" + pictures[i] + "\" width=\"360\" height=\"225\"/></a>\n" +
-                          "<p><a href=\"/pics/original/" + pictures[i] + "\" download>High Resolution Download</a></p>\n" +
-                          "\t\t\t\t\t\t</article>";
+          picturesHTML += '\t\t\t\t\t\t<article>\n' +
+            '\t\t\t\t\t\t\t<a class="thumbnail" href="/pics/resized/1200x750/' + pictures[i] + '" data-position="center"><img class="lazy" src="assets/css/images/placeholder.png" data-original="/pics/resized/360x225/' + pictures[i] + '" width="360" height="225"/></a>\n' +
+            '<p><a href="/pics/original/' + pictures[i] + '" download>High Resolution Download</a></p>\n' +
+            '\t\t\t\t\t\t</article>'
         }
         body = body.toString().replace(/\{title\}/g, renderedTitle)
-                              .replace(/\{comment1\}/g, comment1)
-                              .replace(/\{comment2\}/g, comment2)
-                              .replace(/\{pictures\}/g, picturesHTML);
+          .replace(/\{comment1\}/g, comment1)
+          .replace(/\{comment2\}/g, comment2)
+          .replace(/\{pictures\}/g, picturesHTML)
       }
 
       var options = {
         Bucket: process.env.SITE_BUCKET,
-        Key: title + "/" + path.relative(dir, f),
+        Key: title + '/' + path.relative(dir, f),
         Body: body,
         ContentType: mime.lookup(path.extname(f))
-      };
+      }
 
-      s3.putObject(options, cb);
-    }, function(err, results) {
-      if (err) console.log(err, err.stack);
-    });
-  });
+      s3.putObject(options, cb)
+    }, function (err, results) {
+      if (err) console.log(err, err.stack)
+    })
+  })
 }
 
-function invalidateCloudFront() {
-  cloudfront.listDistributions(function(err, data) {
+function invalidateCloudFront () {
+  cloudfront.listDistributions(function (err, data) {
     // Handle error
     if (err) {
-      console.log(err, err.stack);
-      return;
+      console.log(err, err.stack)
+      return
     }
 
     // Get distribution ID from domain name
     var distributionID = data.Items.find(function (d) {
-      return d.DomainName == process.env.CLOUDFRONT_DISTRIBUTION_DOMAIN;
-    }).Id;
+      return d.DomainName == process.env.CLOUDFRONT_DISTRIBUTION_DOMAIN
+    }).Id
 
     // Create invalidation
     cloudfront.createInvalidation({
@@ -172,54 +225,122 @@ function invalidateCloudFront() {
           ]
         }
       }
-    }, function(err, data) {
-      if (err) console.log(err, err.stack);
-    });
-  });
+    }, function (err, data) {
+      if (err) console.log(err, err.stack)
+    })
+  })
 }
 
-function getAlbumMetadata(album, cb) {
-  s3.getObject({
-    "Bucket": process.env.ORIGINAL_BUCKET,
-    "Key": "pics/original/" + album + "/metadata.yml"
-  }, function(err, data) {
-    if (err) {
-      cb(null, null);
-    } else {
-      try {
-        var doc = yaml.safeLoad(data.Body.toString());
-        cb(null, doc);
-      } catch (err) {
-        cb(null, null);
-      }
-    }
-  });
-}
 
-exports.handler = function(event, context) {
-  // List all bucket objects
-  s3.listObjectsV2({Bucket: process.env.ORIGINAL_BUCKET}, function(err, data) {
-    // Handle error
-    if (err) {
-      console.log(err, err.stack);
-      return;
-    }
+*/
+/*
+// process all the entries for this result page
+const processPage = (data: ListObjectsV2Output, result: Dictionary<IAlbum>): NextToken|undefined => {
 
-    // Parse albums
-    var albumsAndPictures = getAlbums(data);
 
-    // Get metadata for all albums
-    async.map(albumsAndPictures.albums, getAlbumMetadata, function(err, metadata) {
-      // Upload homepage site
-      uploadHomepageSite(albumsAndPictures.albums, albumsAndPictures.pictures, metadata);
+
+/*
 
       // Upload album sites
-      for (var i = albumsAndPictures.albums.length - 1; i >= 0; i--) {
-        uploadAlbumSite(albumsAndPictures.albums[i], albumsAndPictures.pictures[i], metadata[i]);
+      for (let i = albumsAndPictures.albums.length - 1; i >= 0; i--) {
+          uploadAlbumSite(albumsAndPictures.albums[i], albumsAndPictures.pictures[i], metadata[i]);
       }
 
       // Invalidate CloudFront
       invalidateCloudFront();
-    });
-  });
+
+
+  return data.NextContinuationToken;
 };
+*/
+// list all the bucket objects
+const processBucket = () => {
+    let result = [];
+    const cycle = (token) => {
+        return new Promise((resolve, reject) => {
+            // List all bucket objects
+            s3.listObjectsV2({
+                Bucket: bucketName,
+                ContinuationToken: token,
+                MaxKeys: 100,
+            }, (err, data) => {
+                // Handle error
+                if (err) {
+                    console.log("listObjectsV2 error", err, err.stack);
+                    return reject(err);
+                }
+                // console.log("data", data);
+                const contents = lodash_1.default.get(data, "Contents", []);
+                if (contents) {
+                    result = lodash_1.default.concat(result, contents);
+                }
+                const newToken = lodash_1.default.get(data, "NextContinuationToken");
+                if (!newToken) {
+                    return resolve();
+                }
+                cycle(newToken).then(resolve);
+            });
+        });
+    };
+    return cycle().then(() => result);
+};
+// https://docs.aws.amazon.com/lambda/latest/dg/eventsources.html#eventsources-s3-put
+function handler(event, context) {
+    console.log("event ", JSON.stringify(event));
+    /*    async.mapLimit(_.get(event, "Records", []), 4, (record: any, cb: (err: Error|null, result?: any) => void) => {
+            const originalKey = decodeURIComponent(
+                _.get(record, "s3.object.key", "")
+                .replace(/\+/g, " "));
+    
+            s3.getObject({
+                Bucket: record.s3.bucket.name,
+                Key: originalKey,
+            }, (err1: AWSError, data: any) => {
+                if (err1) {
+                    cb(err1);
+                } else {
+                    cb(null, {
+                        Key: originalKey,
+                        LastModified: data.LastModified,
+                        ETag: data.ETag,
+                        Size: data.ContentLength,
+                        // StorageClass: 'STANDARD',
+                    });
+                }
+            });
+        }, (err?: Error|null, result?: any[]) => {
+            if (err) {
+                console.log("error", err, err.stack);
+            }
+    */
+    const result = [];
+    let ok;
+    if (!lodash_1.default.size(result)) {
+        ok = processBucket();
+    }
+    else {
+        ok = Promise.resolve(result);
+    }
+    ok.then((images) => {
+        images = lodash_1.default.filter(images);
+        console.log("images", images);
+        const albums = getAlbums(images);
+        console.log("albums", JSON.stringify(albums));
+        async_1.default.mapLimit(albums, 4, (album, cb) => {
+            getAlbumMetadata(album, (err1, metadata) => {
+                if (metadata) {
+                    // console.log("album", album, "metadata", metadata);
+                    album.metadata = metadata;
+                }
+                cb(null, album);
+            });
+        }, (err1, result1) => {
+            // Upload homepage site
+            uploadHomepageSite(albums);
+            context && context.succeed();
+        });
+    });
+    //    });
+}
+exports.handler = handler;
+//# sourceMappingURL=index.js.map

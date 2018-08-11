@@ -3,7 +3,11 @@ import async from "async";
 import gm from "gm";
 import {default as mime} from "mime";
 import _ from "lodash";
+import path from "path";
 
+const PIPELINE_ID = process.env.PIPELINE_ID || "";
+const PRESET360_ID = process.env.PRESET360_ID || "";
+const PRESET1200_ID = process.env.PRESET1200_ID || "";
 const distributionDomain = process.env.CLOUDFRONT_DISTRIBUTION_DOMAIN || "";
 const bucketName = process.env.RESIZED_BUCKET || "";
 const im = gm.subClass({
@@ -12,10 +16,21 @@ const im = gm.subClass({
 const s3 = new AWS.S3();
 const cloudfront = new AWS.CloudFront();
 const sizes = ["1200x750", "360x225"];
+const elastictranscoder = new AWS.ElasticTranscoder({apiVersion: '2012-09-25'});
 
 const getImageType = (objectContentType): string => {
     const res: string | null = mime.getExtension(objectContentType);
     if (!_.startsWith(objectContentType, "image")) {
+        console.log("unsupported objectContentType " + objectContentType);
+        return "";
+    }
+
+    return res || "";
+};
+
+const getVideoType = (objectContentType: string): string => {
+    const res: string | null = mime.getExtension(objectContentType);
+    if (!_.startsWith(objectContentType, "video")) {
         console.log("unsupported objectContentType " + objectContentType);
         return "";
     }
@@ -101,50 +116,90 @@ function handlePutEvent(records: object[], cb: (err1?: Error|null) => void): voi
                 cb(null, {} /*err*/);
             } else {
                 const imageType = getImageType(data.ContentType);
-                if (_.isEmpty(imageType)) cb(null, {})
+                const videoType = getVideoType(data.ContentType);
+                if (_.isEmpty(imageType) && _.isEmpty(videoType)) cb(null)
                 else cb(null, {
                     buffer: data.Body,
                     contentType: data.ContentType,
                     imageType,
+                    videoType,
                     originalKey,
                     record,
                 });
             }
         });
     }, (err?: Error|null, images?: string[]) => {
-        if (images) images = _.filter(images);
+        console.log("images", images);
+        images = _.filter(images, im => !_.isEmpty(im));
         if (err) {
             cb(err);
         } else if (!_.size(images)) {
             cb();
         } else {
-            // produce image thumbnails
             const resizePairs = cross(sizes, images);
-            async.eachLimit(resizePairs, 4, (resizePair: any[], cb: (err: Error|null, result?: any) => void) => {
+            async.eachLimit(resizePairs, 4, (resizePair: any[], cb: (err: Error | null, result?: any) => void) => {
+                console.log("processing image", resizePair);
                 const config = resizePair[0]
                 const image = resizePair[1]
                 const relativePath = image.originalKey.replace("pics/original/", "")
                 const width = config.split("x")[0]
                 const height = config.split("x")[1]
-                let operation = im(image.buffer).resize(width, height, "^")
 
-                if (config === "360x225") {
-                    operation = operation.gravity("Center").crop(width, height);
+                // produce video thumbnail
+                if (!_.isEmpty(image.videoType)) {
+                    const resizePath = "pics/resized/" + config + "/" + relativePath.replace(path.extname(relativePath), ".gif")
+                    const presetId = parseInt(width) === 360 ? PRESET360_ID : PRESET1200_ID;
+
+                    if (_.isEmpty(presetId)) {
+                        return cb(null);
+                    }
+
+                    console.log("creating elastictranscoder job", resizePath)
+                    s3.deleteObject({
+                        Bucket: bucketName,
+                        Key: resizePath,
+                    }, () => {
+                        elastictranscoder.createJob({
+                            Input: {
+                                Key: image.originalKey,
+                                FrameRate: "10",
+                                TimeSpan: {
+                                    Duration: "5", // take only the first 5 sec
+                                }
+                            },
+                            Output: {
+                                Key: resizePath,
+                                PresetId: presetId,
+                            },
+                            PipelineId: PIPELINE_ID,
+                        }, cb);
+                    });
                 }
 
-                operation.toBuffer(image.imageType, (err3: Error|null, buffer: any) => {
-                    if (err3) cb(err3);
-                    else {
-                        const resizePath = "pics/resized/" + config + "/" + relativePath
-                        console.log("putting resize image", resizePath)
-                        s3.putObject({
-                            Body: buffer,
-                            Bucket: bucketName,
-                            ContentType: image.contentType,
-                            Key: resizePath,
-                        }, cb);
+                // produce image thumbnails
+                else if (!_.isEmpty(image.imageType)) {
+                    const resizePath = "pics/resized/" + config + "/" + relativePath
+                    let operation = im(image.buffer).resize(width, height, "^")
+
+                    if (config === "360x225") {
+                        operation = operation.gravity("Center").crop(width, height);
                     }
-                });
+
+                    operation.toBuffer(image.imageType, (err3: Error | null, buffer: any) => {
+                        if (err3) cb(err3);
+                        else {
+                            console.log("putting resize image", resizePath)
+                            s3.putObject({
+                                Body: buffer,
+                                Bucket: bucketName,
+                                ContentType: image.contentType,
+                                Key: resizePath,
+                            }, cb);
+                        }
+                    });
+                } else {
+                    cb(null);
+                }
             }, cb);
         }
     });
@@ -183,14 +238,20 @@ function handleDeleteEvent(records: object[], cb: (err1?: Error|null) => void): 
 
         async.eachLimit(resizePairs, 4, (resizePair: any[], cb: (err: Error|null, result?: any) => void) => {
             const config = resizePair[0]
-            const image = resizePair[1]
             const resizePath = "pics/resized/" + config + "/" + relativePath
+            const resizePath2 = "pics/resized/" + config + "/" + relativePath.replace(path.extname(relativePath), ".gif")
 
             console.log("deleting resized image", resizePath)
             s3.deleteObject({
                 Bucket: bucketName,
                 Key: resizePath,
-            }, cb);
+            }, () => {
+                console.log("deleting resized image", resizePath2)
+                s3.deleteObject({
+                    Bucket: bucketName,
+                    Key: resizePath2,
+                }, cb);
+            });
         })
     }, cb);
 }

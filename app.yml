@@ -45,6 +45,12 @@ Parameters:
   sslCertificateArn:
     Description: ACM Certificate ARN
     Type: String
+  transcoderPipelineID:
+    Description: Elastic Transcoder Pipeline ID.
+    Type: String
+  transcoderPresetID:
+    Description: Elastic Transcoder Preset ID.
+    Type: String
 
 Conditions:
   createSSLCert: !Equals [ !Ref sslCertificateArn, "" ]
@@ -114,6 +120,10 @@ Resources:
       Role: !GetAtt ResizeLambdaRole.Arn
       Environment:
         Variables:
+          PIPELINE_ID:
+            Ref: transcoderPipelineID
+          PRESET360_ID:
+            Ref: transcoderPresetID
           RESIZED_BUCKET: !Ref resizedBucket
           CLOUDFRONT_DISTRIBUTION_DOMAIN:
             !GetAtt WebDistribution.DomainName
@@ -162,6 +172,14 @@ Resources:
                 Action:
                   - cloudfront:CreateInvalidation
                   - cloudfront:ListDistributions
+        - PolicyName: TranscoderLambdaExecutionPolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Resource: '*'
+                Action:
+                  - "elastictranscoder:CreateJob"
+                Resource: "*"
 
   #
   # Site Builder Lambda function definition

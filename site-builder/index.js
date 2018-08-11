@@ -14,10 +14,10 @@ const bucketName = process.env.ORIGINAL_BUCKET || "";
 const s3 = new aws_sdk_1.default.S3();
 const cloudfront = new aws_sdk_1.default.CloudFront();
 const walk = (dir, done) => {
-    let results = [];
+    const results = {};
     fs_1.default.readdir(dir, (err, list) => {
         if (err) {
-            return done(err, []);
+            return done(err, {});
         }
         let pending = list.length;
         if (!pending) {
@@ -29,16 +29,16 @@ const walk = (dir, done) => {
                 if (stat && stat.isDirectory()) {
                     walk(file, (err2, res) => {
                         if (err2) {
-                            return done(err2, []);
+                            return done(err2, {});
                         }
-                        results = results.concat(res);
+                        lodash_1.default.assignIn(results, res);
                         if (!--pending) {
                             done(null, results);
                         }
                     });
                 }
                 else {
-                    results.push(file);
+                    results[file] = file;
                     if (!--pending) {
                         done(null, results);
                     }
@@ -139,7 +139,7 @@ const uploadHomepageSite = (albums) => {
             };
             console.log("Uploading file", options.Key);
             s3.putObject(options, cb);
-        }, (err1, results) => {
+        }, (err1) => {
             if (err1) {
                 console.log(err1, err1.stack);
             }
@@ -147,9 +147,6 @@ const uploadHomepageSite = (albums) => {
     });
 };
 /*
-
-
-
 
 function uploadAlbumSite (title, pictures, metadata) {
   var dir = 'album'
@@ -288,31 +285,31 @@ const processBucket = () => {
 function handler(event, context) {
     console.log("event ", JSON.stringify(event));
     /*    async.mapLimit(_.get(event, "Records", []), 4, (record: any, cb: (err: Error|null, result?: any) => void) => {
-            const originalKey = decodeURIComponent(
-                _.get(record, "s3.object.key", "")
-                .replace(/\+/g, " "));
-    
-            s3.getObject({
-                Bucket: record.s3.bucket.name,
+    const originalKey = decodeURIComponent(
+        _.get(record, "s3.object.key", "")
+        .replace(/\+/g, " "));
+
+    s3.getObject({
+        Bucket: record.s3.bucket.name,
+        Key: originalKey,
+    }, (err1: AWSError, data: any) => {
+        if (err1) {
+            cb(err1);
+        } else {
+            cb(null, {
                 Key: originalKey,
-            }, (err1: AWSError, data: any) => {
-                if (err1) {
-                    cb(err1);
-                } else {
-                    cb(null, {
-                        Key: originalKey,
-                        LastModified: data.LastModified,
-                        ETag: data.ETag,
-                        Size: data.ContentLength,
-                        // StorageClass: 'STANDARD',
-                    });
-                }
+                LastModified: data.LastModified,
+                ETag: data.ETag,
+                Size: data.ContentLength,
+                // StorageClass: 'STANDARD',
             });
-        }, (err?: Error|null, result?: any[]) => {
-            if (err) {
-                console.log("error", err, err.stack);
-            }
-    */
+        }
+    });
+}, (err?: Error|null, result?: any[]) => {
+    if (err) {
+        console.log("error", err, err.stack);
+    }
+*/
     const result = [];
     let ok;
     if (!lodash_1.default.size(result)) {

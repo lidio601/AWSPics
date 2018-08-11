@@ -6,8 +6,6 @@ import path from "path";
 import yaml from "js-yaml";
 import {GetObjectOutput, ListObjectsV2Output, ListObjectsV2Request, NextToken} from "aws-sdk/clients/s3";
 import _ from "lodash";
-import {GetObjectResponse} from "aws-sdk/clients/mediastoredata";
-import {LambdaOutput} from "aws-sdk/clients/kinesisanalytics";
 
 const bucketName = process.env.ORIGINAL_BUCKET || "";
 const s3 = new AWS.S3();
@@ -28,11 +26,11 @@ interface IAlbum {
     metadata: object|null;
 }
 
-const walk = (dir: string, done: (err: Error|null, results: string[]) => void) => {
-  let results: string[] = [];
+const walk = (dir: string, done: (err: Error|null, results: Dictionary<string>) => void) => {
+  const results: Dictionary<string> = {};
   fs.readdir(dir, (err: Error|null, list: string[]) => {
     if (err) {
-      return done(err, []);
+      return done(err, {});
     }
 
     let pending = list.length;
@@ -45,18 +43,18 @@ const walk = (dir: string, done: (err: Error|null, results: string[]) => void) =
 
       fs.stat(file, (err1: Error|null, stat: any) => {
         if (stat && stat.isDirectory()) {
-          walk(file, (err2: Error|null, res: string[]) => {
+          walk(file, (err2: Error|null, res: Dictionary<string>) => {
             if (err2) {
-              return done(err2, []);
+              return done(err2, {});
             }
 
-            results = results.concat(res);
+            _.assignIn(results, res);
             if (!--pending) {
               done(null, results);
             }
           });
         } else {
-          results.push(file);
+          results[file] = file;
 
           if (!--pending) {
             done(null, results);
@@ -140,7 +138,7 @@ const getAlbumMetadata = (album: IAlbum, cb: (err: Error|null, doc: any) => void
 
 const uploadHomepageSite = (albums: Dictionary<IAlbum>): void => {
     const tmplDir = "homepage";
-    walk(tmplDir, (err: Error|null, files: string[]): void => {
+    walk(tmplDir, (err: Error|null, files: Dictionary<string>): void => {
         if (err) {
             throw err;
         }
@@ -179,7 +177,7 @@ const uploadHomepageSite = (albums: Dictionary<IAlbum>): void => {
 
             console.log("Uploading file", options.Key);
             s3.putObject(options, cb);
-        }, (err1: Error|null, results: any) => {
+        }, (err1?: Error|null) => {
             if (err1) {
                 console.log(err1, err1.stack);
             }
@@ -188,9 +186,6 @@ const uploadHomepageSite = (albums: Dictionary<IAlbum>): void => {
 };
 
 /*
-
-
-
 
 function uploadAlbumSite (title, pictures, metadata) {
   var dir = 'album'
@@ -335,62 +330,62 @@ const processBucket = (): Promise<object[]> => {
 // https://docs.aws.amazon.com/lambda/latest/dg/eventsources.html#eventsources-s3-put
 export function handler(event: any, context: any): void {
     console.log("event ", JSON.stringify(event));
-/*    async.mapLimit(_.get(event, "Records", []), 4, (record: any, cb: (err: Error|null, result?: any) => void) => {
-        const originalKey = decodeURIComponent(
-            _.get(record, "s3.object.key", "")
-            .replace(/\+/g, " "));
+    /*    async.mapLimit(_.get(event, "Records", []), 4, (record: any, cb: (err: Error|null, result?: any) => void) => {
+    const originalKey = decodeURIComponent(
+        _.get(record, "s3.object.key", "")
+        .replace(/\+/g, " "));
 
-        s3.getObject({
-            Bucket: record.s3.bucket.name,
-            Key: originalKey,
-        }, (err1: AWSError, data: any) => {
-            if (err1) {
-                cb(err1);
-            } else {
-                cb(null, {
-                    Key: originalKey,
-                    LastModified: data.LastModified,
-                    ETag: data.ETag,
-                    Size: data.ContentLength,
-                    // StorageClass: 'STANDARD',
-                });
-            }
-        });
-    }, (err?: Error|null, result?: any[]) => {
-        if (err) {
-            console.log("error", err, err.stack);
-        }
-*/
-        const result = [];
-
-        let ok: Promise<object[]>;
-        if (!_.size(result)) {
-            ok = processBucket();
+    s3.getObject({
+        Bucket: record.s3.bucket.name,
+        Key: originalKey,
+    }, (err1: AWSError, data: any) => {
+        if (err1) {
+            cb(err1);
         } else {
-            ok = Promise.resolve(result);
-        }
-
-        ok.then((images: object[]): Dictionary<IAlbum> => {
-            images = _.filter(images);
-            console.log("images", images);
-
-            const albums = getAlbums(images);
-            console.log("albums", JSON.stringify(albums));
-
-            async.mapLimit(albums, 4, (album: IAlbum, cb: (err: Error|null, result?: any) => void) => {
-                getAlbumMetadata(album, (err1: Error | null, metadata: any): void => {
-                    if (metadata) {
-                        // console.log("album", album, "metadata", metadata);
-                        album.metadata = metadata;
-                    }
-                    cb(null, album);
-                });
-            }, (err1?: Error|null, result1?: any[]) => {
-                // Upload homepage site
-                uploadHomepageSite(albums);
-
-                context && context.succeed();
+            cb(null, {
+                Key: originalKey,
+                LastModified: data.LastModified,
+                ETag: data.ETag,
+                Size: data.ContentLength,
+                // StorageClass: 'STANDARD',
             });
+        }
+    });
+}, (err?: Error|null, result?: any[]) => {
+    if (err) {
+        console.log("error", err, err.stack);
+    }
+*/
+    const result = [];
+
+    let ok: Promise<object[]>;
+    if (!_.size(result)) {
+        ok = processBucket();
+    } else {
+        ok = Promise.resolve(result);
+    }
+
+    ok.then((images: object[]) => {
+        images = _.filter(images);
+        console.log("images", images);
+
+        const albums = getAlbums(images);
+        console.log("albums", JSON.stringify(albums));
+
+        async.mapLimit(albums, 4, (album: IAlbum, cb: (err: Error|null, result?: any) => void) => {
+            getAlbumMetadata(album, (err1: Error | null, metadata: any): void => {
+                if (metadata) {
+                    // console.log("album", album, "metadata", metadata);
+                    album.metadata = metadata;
+                }
+                cb(null, album);
+            });
+        }, (err1?: Error|null, result1?: any[]) => {
+            // Upload homepage site
+            uploadHomepageSite(albums);
+
+            context && context.succeed();
         });
-//    });
+    });
+    //    });
 }

@@ -109,12 +109,14 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: index.handler
-      Runtime: nodejs6.10
+      Runtime: nodejs8.10
       CodeUri: dist/lambda-resize.zip
       Role: !GetAtt ResizeLambdaRole.Arn
       Environment:
         Variables:
           RESIZED_BUCKET: !Ref resizedBucket
+          CLOUDFRONT_DISTRIBUTION_DOMAIN:
+            !GetAtt WebDistribution.DomainName
       Timeout: 30
       MemorySize: 1024
 
@@ -151,72 +153,8 @@ Resources:
                 Resource: !Sub
                   - 'arn:aws:s3:::${resizedBucket}/*'
                   - resizedBucket: !Ref resizedBucket
-                Action: ['s3:PutObject']
-
-  #
-  # Site Builder Lambda function definition
-  #
-  SiteBuilderFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: index.handler
-      Runtime: nodejs6.10
-      CodeUri: dist/lambda-site-builder.zip
-      Environment:
-        Variables:
-          WEBSITE_TITLE: !Ref websiteTitle
-          CLOUDFRONT_DISTRIBUTION_DOMAIN:
-            !GetAtt WebDistribution.DomainName
-          ORIGINAL_BUCKET: !Ref sourceBucket
-          SITE_BUCKET: !Ref webBucket
-          WEBSITE: !Ref website
-      Role: !GetAtt SiteBuilderLambdaRole.Arn
-      Timeout: 30
-      MemorySize: 1024
-
-  #
-  # Site Builder IAM role so the Lambda can log (CloudWatch) and read/write S3 objects
-  #
-  SiteBuilderLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      Path: /
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: AllowLambdaServiceToAssumeRole
-            Effect: Allow
-            Action: ['sts:AssumeRole']
-            Principal:
-              Service: [lambda.amazonaws.com]
-      Policies:
-        - PolicyName: SiteBuilderLambdaGetOriginal
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Resource: !Sub
-                  - 'arn:aws:s3:::${sourceBucket}/*'
-                  - sourceBucket: !Ref sourceBucket
-                Action: ['s3:GetObject']
-        - PolicyName: SiteBuilderLambdaListOriginal
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Resource: !Sub
-                  - 'arn:aws:s3:::${sourceBucket}'
-                  - sourceBucket: !Ref sourceBucket
-                Action: ['s3:ListBucket']
-        - PolicyName: SiteBuilderLambdaPutSite
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Resource: !Sub
-                  - 'arn:aws:s3:::${webBucket}/*'
-                  - webBucket: !Ref webBucket
-                Action: ['s3:PutObject']
-        - PolicyName: SiteBuilderLambdaInvalidateDistribution
+                Action: ['s3:PutObject', 's3:DeleteObject']
+        - PolicyName: ResizeLambdaInvalidateDistribution
           PolicyDocument:
             Statement:
               - Effect: Allow
@@ -224,6 +162,78 @@ Resources:
                 Action:
                   - cloudfront:CreateInvalidation
                   - cloudfront:ListDistributions
+
+  #
+  # Site Builder Lambda function definition
+  #
+#  SiteBuilderFunction:
+#    Type: AWS::Serverless::Function
+#    Properties:
+#      Handler: index.handler
+#      Runtime: nodejs6.10
+#      CodeUri: dist/lambda-site-builder.zip
+#      Environment:
+#        Variables:
+#          WEBSITE_TITLE: !Ref websiteTitle
+#          CLOUDFRONT_DISTRIBUTION_DOMAIN:
+#            !GetAtt WebDistribution.DomainName
+#          ORIGINAL_BUCKET: !Ref sourceBucket
+#          SITE_BUCKET: !Ref webBucket
+#          WEBSITE: !Ref website
+#      Role: !GetAtt SiteBuilderLambdaRole.Arn
+#      Timeout: 30
+#      MemorySize: 1024
+
+  #
+  # Site Builder IAM role so the Lambda can log (CloudWatch) and read/write S3 objects
+  #
+#   SiteBuilderLambdaRole:
+#     Type: AWS::IAM::Role
+#     Properties:
+#       Path: /
+#       ManagedPolicyArns:
+#         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+#       AssumeRolePolicyDocument:
+#         Version: '2012-10-17'
+#         Statement:
+#           - Sid: AllowLambdaServiceToAssumeRole
+#             Effect: Allow
+#             Action: ['sts:AssumeRole']
+#             Principal:
+#               Service: [lambda.amazonaws.com]
+#       Policies:
+#         - PolicyName: SiteBuilderLambdaGetOriginal
+#           PolicyDocument:
+#             Statement:
+#               - Effect: Allow
+#                 Resource: !Sub
+#                   - 'arn:aws:s3:::${sourceBucket}/*'
+#                   - sourceBucket: !Ref sourceBucket
+#                 Action: ['s3:GetObject']
+#         - PolicyName: SiteBuilderLambdaListOriginal
+#           PolicyDocument:
+#             Statement:
+#               - Effect: Allow
+#                 Resource: !Sub
+#                   - 'arn:aws:s3:::${sourceBucket}'
+#                   - sourceBucket: !Ref sourceBucket
+#                 Action: ['s3:ListBucket']
+#         - PolicyName: SiteBuilderLambdaPutSite
+#           PolicyDocument:
+#             Statement:
+#               - Effect: Allow
+#                 Resource: !Sub
+#                   - 'arn:aws:s3:::${webBucket}/*'
+#                   - webBucket: !Ref webBucket
+#                 Action: ['s3:PutObject']
+#         - PolicyName: SiteBuilderLambdaInvalidateDistribution
+#           PolicyDocument:
+#             Statement:
+#               - Effect: Allow
+#                 Resource: '*'
+#                 Action:
+#                   - cloudfront:CreateInvalidation
+#                   - cloudfront:ListDistributions
 
   #
   # Source Bucket
@@ -247,6 +257,8 @@ Resources:
         LambdaConfigurations:
           - Event: 's3:ObjectCreated:*'
             Function: !GetAtt ResizeFunction.Arn
+          - Event: 's3:ObjectRemoved:*'
+            Function: !GetAtt ResizeFunction.Arn
   SourceBucketPolicy:
     Type: AWS::S3::BucketPolicy
     DependsOn: SourceBucket
@@ -268,24 +280,24 @@ Resources:
   #
   # Resized Bucket
   #
-  SiteBuilderInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref SiteBuilderFunction
-      Principal: s3.amazonaws.com
-      SourceAccount: !Ref AWS::AccountId
-      SourceArn: !Sub
-        - arn:aws:s3:::${resizedBucket}
-        - resizedBucket: !Ref resizedBucket
+#  SiteBuilderInvokePermission:
+#    Type: AWS::Lambda::Permission
+#    Properties:
+#      Action: lambda:InvokeFunction
+#      FunctionName: !Ref SiteBuilderFunction
+#      Principal: s3.amazonaws.com
+#      SourceAccount: !Ref AWS::AccountId
+#      SourceArn: !Sub
+#        - arn:aws:s3:::${resizedBucket}
+#        - resizedBucket: !Ref resizedBucket
   ResizedBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Ref resizedBucket
-      NotificationConfiguration:
-        LambdaConfigurations:
-          - Event: 's3:ObjectCreated:*'
-            Function: !GetAtt SiteBuilderFunction.Arn
+#      NotificationConfiguration:
+#        LambdaConfigurations:
+#          - Event: 's3:ObjectCreated:*'
+#            Function: !GetAtt SiteBuilderFunction.Arn
   ResizedBucketPolicy:
     Type: AWS::S3::BucketPolicy
     DependsOn: ResizedBucket

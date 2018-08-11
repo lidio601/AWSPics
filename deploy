@@ -41,5 +41,5 @@ aws cloudformation deploy \
     --parameter-overrides file://dist/config.json || true
 
 # Invoke SiteBuilder function
-funcName="$(aws cloudformation describe-stack-resource --stack-name ${stackName} --logical-resource-id SiteBuilderFunction | sed -n 's/.*"PhysicalResourceId": "\(.*\)",/\1/p')"
-aws lambda invoke --function-name ${funcName} "$(mktemp)"
+#funcName="$(aws cloudformation describe-stack-resource --stack-name ${stackName} --logical-resource-id SiteBuilderFunction | sed -n 's/.*"PhysicalResourceId": "\(.*\)",/\1/p')"
+#aws lambda invoke --function-name ${funcName} "$(mktemp)"

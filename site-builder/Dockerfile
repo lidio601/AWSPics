@@ -10,6 +10,7 @@ RUN npm install --production
 
 # add source code
 COPY index.js /build/index.js
+COPY index.js.map /build/index.js.map
 
 # add HTML templates
 COPY homepage /build/homepage

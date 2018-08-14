@@ -17,6 +17,10 @@
     "@types/lodash": "^4.14.116",
     "@types/mime": "^2.0.0",
     "@types/node": "^10.5.6",
-    "aws-sdk": "latest"
+    "aws-sdk": "latest",
+    "http-server": "^0.11.1"
+  },
+  "scripts": {
+    "start": "http-server ./ -i -o"
   }
 }

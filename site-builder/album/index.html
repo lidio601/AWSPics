@@ -1,41 +1,97 @@
 <!DOCTYPE HTML>
 <html>
-	<head>
-		<title>{title}</title>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
-		<link rel="stylesheet" href="assets/css/main.css" />
-		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
-		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
-		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
-	</head>
-	<body>
-			<div id="main">
-					<header id="header">
-						<h1>{title}</h1>
-						<p>{comment1}</p>
-						<p>{comment2}</p>
-						<p><a href="/">Back to albums.</a></p>
-					</header>
-					<section id="thumbnails">
-{pictures}
-					</section>
-					<footer id="footer">
-						<ul class="copyright">
-							<li>Design: <a href="https://html5up.net">HTML5 UP</a>.</li>
-						</ul>
-					</footer>
-			</div>
-			<script src="assets/js/jquery.min.js"></script>
-			<script src="assets/js/skel.min.js"></script>
-			<!--[if lte IE 8]><script src="assets/js/ie/respond.min.js"></script><![endif]-->
-			<script src="assets/js/main.js"></script>
-      <script src="assets/js/jquery.lazyload.js"></script>
-      <script type="text/javascript" charset="utf-8">
-      $(window).ready(function() {
-          $("img.lazy").lazyload();
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <!--[if lte IE 8]>
+    <script src="../assets/js/ie/html5shiv.js"></script><![endif]-->
+    <link rel="stylesheet" href="assets/css/main.css"/>
+    <!--[if lte IE 8]>
+    <link rel="stylesheet" href="assets/css/ie8.css"/><![endif]-->
+    <!--[if lte IE 9]>
+    <link rel="stylesheet" href="assets/css/ie9.css"/><![endif]-->
+    <noscript>
+        <link rel="stylesheet" href="../assets/css/noscript.css"/>
+    </noscript>
+</head>
+<body>
+<div id="main">
+    <header id="header">
+        <h1 class="js-album-title"></h1>
+        <p class="js-comment-1"></p>
+        <p class="js-comment-2"></p>
+        <p><a href="/" class="js-back-url">Back to albums.</a></p>
+    </header>
+    <section id="thumbnails" class="js-thumb-list"></section>
+    <footer id="footer">
+        <ul class="copyright">
+            <li>Design: <a href="https://html5up.net">HTML5 UP</a>.</li>
+        </ul>
+    </footer>
+</div>
+<script src="../assets/js/jquery.min.js"></script>
+<script src="../assets/js/lodash.min.js"></script>
+<script src="../assets/js/skel.min.js"></script>
+<script src="../assets/js/util.js"></script>
+<!--[if lte IE 8]>
+<script src="../assets/js/ie/respond.min.js"></script>
+<![endif]-->
+<script src="assets/js/main.js"></script>
+<script src="assets/js/jquery.lazyload.js"></script>
+<script type="text/javascript" charset="utf-8">
+
+  var indexUrl = _.defaultTo($.fn.queryParam('i'), '/pics/index/index.json');
+  var $container = $('.js-thumb-list');
+  var $title = $('.js-album-title');
+  var $comment1 = $('.js-comment-1');
+  var $comment2 = $('.js-comment-2');
+  var $backURl = $('.js-back-url');
+
+  $.getJSON(indexUrl)
+    .then(function (response) {
+      console.log(response);
+
+      $container.empty();
+
+      $title.html(response.title);
+      $comment1.html(response.comment1);
+      $comment2.html(response.comment2);
+
+      var albums = _.get(response, 'albums', []);
+      var parentUrl = indexUrl;
+      if (!_.size(albums)) {
+        parentUrl = _.join(_.initial(_.initial(_.split(parentUrl, "/"))), "/") + "/index.json"
+      }
+      $backURl.attr('href', '/index.html?i=' + parentUrl);
+
+      /*_.each(albums, function (album) {
+        $("<article class=\"thumb\">" +
+          "<a href=\"/index.html?i=/" + album.index + "\" class=\"image\">" +
+          "<img src=\"" + album.path + "/" + album.thumb + "\" width=\"320\" height=\"225\" alt=\"\" />" +
+          "</a>" +
+          "<h2>" + album.title + "</h2>" +
+          "</article>").appendTo($container);
+      });*/
+
+      var items = _.get(response, 'items', []);
+      _.each(items, function (item) {
+        $("<article>" +
+            "<a class=\"thumbnail\" href=\"/" + item.full + "\" data-position=\"center\">" +
+                "<img class=\"lazy\" " +
+                  "src=\"assets/css/images/placeholder.png\" " +
+                  "data-original=\"/" + item.path + "\" width=\"360\" height=\"225\"/>" +
+            "</a>" +
+            "<p>" +
+                "<a href=\"/" + item.orig + "\" download>" +
+                    "High Resolution Download" +
+                "</a>" +
+            "</p>" +
+          "</article>").appendTo($container);
       });
-      </script>
-	</body>
+
+      $("img.lazy").lazyload();
+      main.init();
+    });
+</script>
+</body>
 </html>

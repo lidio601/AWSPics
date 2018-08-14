@@ -185,6 +185,67 @@ Resources:
                 Resource: "*"
 
   #
+  # Index Lambda function definition
+  #
+  IndexFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs8.10
+      CodeUri: dist/lambda-indexer.zip
+      Role: !GetAtt IndexLambdaRole.Arn
+      Environment:
+        Variables:
+          INDEX_BUCKET: !Ref indexBucket
+          CLOUDFRONT_DISTRIBUTION_DOMAIN:
+            !GetAtt WebDistribution.DomainName
+      Timeout: 30
+      MemorySize: 2048
+
+  #
+  # Index IAM role so the Lambda can log (CloudWatch) and read/write S3 objects
+  #
+  ResizeLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowLambdaServiceToAssumeRole
+            Effect: Allow
+            Action: ['sts:AssumeRole']
+            Principal:
+              Service: [lambda.amazonaws.com]
+      Policies:
+        - PolicyName: IndexLambdaListOriginal
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Resource: !Sub
+                  - 'arn:aws:s3:::${sourceBucket}/*'
+                  - sourceBucket: !Ref sourceBucket
+                Action: ['s3:ListObject']
+        - PolicyName: IndexLambdaPutIndex
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Resource: !Sub
+                  - 'arn:aws:s3:::${indexBucket}/*'
+                  - indexBucket: !Ref indexBucket
+                Action: ['s3:PutObject', 's3:DeleteObject']
+        - PolicyName: IndexLambdaInvalidateDistribution
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Resource: '*'
+                Action:
+                  - cloudfront:CreateInvalidation
+                  - cloudfront:ListDistributions
+
+  #
   # Site Builder Lambda function definition
   #
 #  SiteBuilderFunction:

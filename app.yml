@@ -16,6 +16,9 @@ Parameters:
   resizedBucket:
     Description: Bucket to store resized pictures
     Type: String
+  indexBucket:
+    Description: Bucket to store indexes
+    Type: String
   originAccessIdentity:
     Description: CloudFront OAI
     Type: String
@@ -360,6 +363,31 @@ Resources:
                 - id: !Ref originAccessIdentity
 
   #
+  # Index Bucket
+  #
+  IndexBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref indexBucket
+  IndexBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: IndexBucket
+    Properties:
+      Bucket: !Ref IndexBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:GetObject
+            Effect: Allow
+            Resource: !Sub
+              - '${bucket}/*'
+              - bucket: !GetAtt IndexBucket.Arn
+            Principal:
+              AWS: !Sub
+                - arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${id}
+                - id: !Ref originAccessIdentity
+
+  #
   # SSL Certificate
   #
   SSLCert:
@@ -403,6 +431,14 @@ Resources:
                 - origin-access-identity/cloudfront/${id}
                 - id: !Ref originAccessIdentity
           - DomainName: !Sub
+              - ${indexBucket}.s3.amazonaws.com
+              - indexBucket: !Ref indexBucket
+            Id: S3-IndexBucket
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub
+                - origin-access-identity/cloudfront/${id}
+                - id: !Ref originAccessIdentity
+          - DomainName: !Sub
               - ${apiID}.execute-api.${AWS::Region}.amazonaws.com
               - apiID: !Ref ServerlessRestApi
             Id: Custom-LoginAPI
@@ -421,6 +457,13 @@ Resources:
               - self
             ViewerProtocolPolicy: https-only
             PathPattern: 'pics/original/*'
+            ForwardedValues:
+              QueryString: 'false'
+          - TargetOriginId: S3-IndexBucket
+            TrustedSigners:
+              - self
+            ViewerProtocolPolicy: https-only
+            PathPattern: 'pics/index/*'
             ForwardedValues:
               QueryString: 'false'
           - TargetOriginId: Custom-LoginAPI

@@ -1,0 +1,23 @@
+{
+  "name": "lambda-indexer",
+  "version": "1.0.0",
+  "description": "AWS Lambda function that generate a JSON index of all the images",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Fabio Cigliano",
+  "license": "MIT",
+  "dependencies": {
+    "bluebird": "^3.5.1",
+    "lodash": "^4.17.10",
+    "mime": "^2.3.1"
+  },
+  "devDependencies": {
+    "@types/bluebird": "^3.5.23",
+    "@types/lodash": "^4.14.116",
+    "@types/mime": "^2.0.0",
+    "@types/node": "^10.5.8",
+    "aws-sdk": "^2.291.0"
+  }
+}

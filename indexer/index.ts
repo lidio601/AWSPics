@@ -1,10 +1,8 @@
-import fs from "fs";
 import path from "path";
 import AWS, {AWSError} from "aws-sdk";
-//import async, {Dictionary} from "async";
 import {default as mime} from "mime";
-//import yaml from "js-yaml";
-import {ListObjectsV2Output, NextToken} from "aws-sdk/clients/s3";
+import yaml from "js-yaml";
+import {GetObjectOutput, ListObjectsV2Output, NextToken} from "aws-sdk/clients/s3";
 import _ from "lodash";
 import Bluebird from "bluebird";
 
@@ -15,20 +13,58 @@ const distributionDomain = process.env.CLOUDFRONT_DISTRIBUTION_DOMAIN || "";
 const s3 = new AWS.S3();
 const cloudfront = new AWS.CloudFront();
 
+const indexMap: object = {};
+const yamlMap: object = {};
+
 const isImage = (type: string): boolean => _.startsWith(type, 'image');
 const isVideo = (type: string): boolean => _.startsWith(type, 'video');
 const isFile  = (item: object): boolean => _.get(item, '1.File', false);
 const mkPath  = (path: (string|undefined)[]): string => _.join(_.filter(path), "/")
 
-const indexMap: object = {};
-
-const makeIndex = (indexPath: string, index: object): Bluebird<any> => {
+const getAlbumMetadata = (path: string): Bluebird<any> => {
     let ok: Bluebird<any>|null = null;
 
-    if (_.has(indexMap, indexPath)) {
-        ok = Bluebird.resolve(_.get(indexMap, indexPath));
+    if (_.has(yamlMap, path)) {
+        ok = Bluebird.resolve(_.get(yamlMap, path));
     } else {
         ok = new Bluebird(resolve => {
+            s3.getObject({
+                Bucket: bucketName,
+                Key: path + "/metadata.yml",
+            }, (err: AWSError, data: GetObjectOutput): void => {
+                try {
+                    // ignore if missing
+                    if (err)    return resolve({});
+
+                    const doc: any = yaml.safeLoad(_.toString(_.get(data, "Body")));
+                    yamlMap[path] = doc
+
+                    return resolve(doc)
+                } catch (err) {
+                    // ignore if error while parsing
+                    return resolve({})
+                }
+            });
+        });
+    }
+
+    return ok;
+};
+
+const makeIndex = (albumPath: string, indexPath: string, index: object): Bluebird<any> => {
+    let ok: Bluebird<any>;
+    let metadata: object;
+
+    // load album metadata
+    ok = getAlbumMetadata(albumPath)
+        .then(data => {
+            metadata = data
+        });
+
+    if (_.has(indexMap, indexPath)) {
+        ok = ok.then(() => Bluebird.resolve(_.get(indexMap, indexPath)));
+    } else {
+        ok = ok.then(() => new Bluebird(resolve => {
             s3.getObject({
                 Bucket: bucketName2,
                 Key: indexPath,
@@ -44,7 +80,7 @@ const makeIndex = (indexPath: string, index: object): Bluebird<any> => {
 
                 resolve(data)
             });
-        });
+        }));
     }
 
     return ok.then((existing: object) => {
@@ -58,6 +94,7 @@ const makeIndex = (indexPath: string, index: object): Bluebird<any> => {
             _.get(index, 'items', []),
             'path'
         ))
+        _.assignIn(index, metadata)
         indexMap[indexPath] = index;
         // console.log('output index', index);
 
@@ -85,9 +122,12 @@ const scanPages = (page: object, basepath?: string): Bluebird<any> => {
     const fileList: object = _.fromPairs(_.filter(data, isFile))
     // console.log('scanning', {basepath, folderList, fileList})
 
+    const originalPath = mkPath(["pics/original", basepath])
     const relativePath = mkPath(["pics/index", basepath, "index.json"])
     const index = {
-        path: mkPath(["pics/original", basepath]),
+        path: originalPath,
+        thumb: mkPath(["pics/resized/360x225", basepath]),
+        full: mkPath(["pics/resized/1200x750", basepath]),
         title: basepath,
         albums: _.map(folderList, (data: object, key: string) => {
             return {
@@ -99,14 +139,14 @@ const scanPages = (page: object, basepath?: string): Bluebird<any> => {
         }),
         items: _.map(fileList, (data: object, key: string) => {
             return {
-                path: mkPath(["pics/resized/360x225", basepath, key]),
+                path: mkPath([originalPath, key]),
                 type: _.get(data, 'Type'),
             }
         }),
     };
 
-    // console.log('index', relativePath, index);
-    return makeIndex(relativePath, index)
+    // console.log('index', originalPath, relativePath, index);
+    return makeIndex(originalPath, relativePath, index)
         .then(() =>
             Bluebird.map(_.keys(folderList), (dirname: string) => {
                 return scanPages(

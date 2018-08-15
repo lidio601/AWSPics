@@ -47,6 +47,14 @@
   var $comment2 = $('.js-comment-2');
   var $backURl = $('.js-back-url');
 
+  function mkPath (path) {
+      return _.join(path, "/")
+  }
+
+  function basename (path) {
+      return _.last(_.split(path, "/"));
+  }
+
   $.getJSON(indexUrl)
     .then(function (response) {
       console.log(response);
@@ -60,29 +68,24 @@
       var albums = _.get(response, 'albums', []);
       var parentUrl = indexUrl;
       if (!_.size(albums)) {
+        // get parent index path
         parentUrl = _.join(_.initial(_.initial(_.split(parentUrl, "/"))), "/") + "/index.json"
       }
       $backURl.attr('href', '/index.html?i=' + parentUrl);
 
-      /*_.each(albums, function (album) {
-        $("<article class=\"thumb\">" +
-          "<a href=\"/index.html?i=/" + album.index + "\" class=\"image\">" +
-          "<img src=\"" + album.path + "/" + album.thumb + "\" width=\"320\" height=\"225\" alt=\"\" />" +
-          "</a>" +
-          "<h2>" + album.title + "</h2>" +
-          "</article>").appendTo($container);
-      });*/
-
       var items = _.get(response, 'items', []);
       _.each(items, function (item) {
+        var filename = basename(item.path);
+        var fullUrl = mkPath([response.full, filename]);
+        var thumbUrl = mkPath([response.thumb, filename]);
         $("<article>" +
-            "<a class=\"thumbnail\" href=\"/" + item.full + "\" data-position=\"center\">" +
+            "<a class=\"thumbnail\" href=\"/" + fullUrl + "\" data-position=\"center\">" +
                 "<img class=\"lazy\" " +
                   "src=\"assets/css/images/placeholder.png\" " +
-                  "data-original=\"/" + item.path + "\" width=\"360\" height=\"225\"/>" +
+                  "data-original=\"/" + thumbUrl + "\" width=\"360\" height=\"225\"/>" +
             "</a>" +
             "<p>" +
-                "<a href=\"/" + item.orig + "\" download>" +
+                "<a href=\"/" + item.path + "\" download>" +
                     "High Resolution Download" +
                 "</a>" +
             "</p>" +

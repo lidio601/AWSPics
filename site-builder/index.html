@@ -38,6 +38,14 @@
   var $container = $('.js-picture-list');
   var $title = $('.js-album-title');
 
+  function mkPath (path) {
+      return _.join(path, "/")
+  }
+
+  function basename (path) {
+      return _.last(_.split(path, "/"));
+  }
+
   $.getJSON(indexUrl)
     .then(function (response) {
       console.log(response);
@@ -53,9 +61,10 @@
       }
 
       _.each(albums, function (album) {
+        var thumbUrl = mkPath([album.path, album.thumb]);
         $("<article class=\"thumb\">" +
               "<a href=\"/index.html?i=/" + album.index + "\" class=\"image\">" +
-                "<img src=\"" + album.path + "/" + album.thumb + "\" alt=\"\" />" +
+                "<img src=\"" + thumbUrl + "\" alt=\"\" />" +
               "</a>" +
               "<h2>" + album.title + "</h2>" +
           "</article>").appendTo($container);
@@ -63,9 +72,11 @@
 
       var items = _.get(response, 'items', []);
       if (_.size(items)) {
+          var thumbFilename = basename(_.first(items));
+          var thumbUrl = mkPath([response.thumb, thumbFilename]);
         $("<article class=\"thumb\">" +
               "<a href=\"/album/index.html?i=" + indexUrl + "\" class=\"image\">" +
-                "<img src=\"" + _.first(items).full + "\" alt=\"\" />" +
+                "<img src=\"" + thumbUrl + "\" alt=\"" + thumbFilename + "\" />" +
               "</a>" +
               "<h2>" + response.title + "</h2>" +
           "</article>").appendTo($container);

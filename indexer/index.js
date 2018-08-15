@@ -4,8 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const aws_sdk_1 = __importDefault(require("aws-sdk"));
-//import async, {Dictionary} from "async";
 const mime_1 = __importDefault(require("mime"));
+const js_yaml_1 = __importDefault(require("js-yaml"));
 const lodash_1 = __importDefault(require("lodash"));
 const bluebird_1 = __importDefault(require("bluebird"));
 const bucketName = process.env.ORIGINAL_BUCKET || "";
@@ -13,18 +13,53 @@ const bucketName2 = process.env.INDEX_BUCKET || "";
 const distributionDomain = process.env.CLOUDFRONT_DISTRIBUTION_DOMAIN || "";
 const s3 = new aws_sdk_1.default.S3();
 const cloudfront = new aws_sdk_1.default.CloudFront();
+const indexMap = {};
+const yamlMap = {};
 const isImage = (type) => lodash_1.default.startsWith(type, 'image');
 const isVideo = (type) => lodash_1.default.startsWith(type, 'video');
 const isFile = (item) => lodash_1.default.get(item, '1.File', false);
 const mkPath = (path) => lodash_1.default.join(lodash_1.default.filter(path), "/");
-const indexMap = {};
-const makeIndex = (indexPath, index) => {
+const getAlbumMetadata = (path) => {
     let ok = null;
-    if (lodash_1.default.has(indexMap, indexPath)) {
-        ok = bluebird_1.default.resolve(lodash_1.default.get(indexMap, indexPath));
+    if (lodash_1.default.has(yamlMap, path)) {
+        ok = bluebird_1.default.resolve(lodash_1.default.get(yamlMap, path));
     }
     else {
         ok = new bluebird_1.default(resolve => {
+            s3.getObject({
+                Bucket: bucketName,
+                Key: path + "/metadata.yml",
+            }, (err, data) => {
+                try {
+                    // ignore if missing
+                    if (err)
+                        return resolve({});
+                    const doc = js_yaml_1.default.safeLoad(lodash_1.default.toString(lodash_1.default.get(data, "Body")));
+                    yamlMap[path] = doc;
+                    return resolve(doc);
+                }
+                catch (err) {
+                    // ignore if error while parsing
+                    return resolve({});
+                }
+            });
+        });
+    }
+    return ok;
+};
+const makeIndex = (albumPath, indexPath, index) => {
+    let ok;
+    let metadata;
+    // load album metadata
+    ok = getAlbumMetadata(albumPath)
+        .then(data => {
+        metadata = data;
+    });
+    if (lodash_1.default.has(indexMap, indexPath)) {
+        ok = ok.then(() => bluebird_1.default.resolve(lodash_1.default.get(indexMap, indexPath)));
+    }
+    else {
+        ok = ok.then(() => new bluebird_1.default(resolve => {
             s3.getObject({
                 Bucket: bucketName2,
                 Key: indexPath,
@@ -40,11 +75,12 @@ const makeIndex = (indexPath, index) => {
                 }
                 resolve(data);
             });
-        });
+        }));
     }
     return ok.then((existing) => {
         lodash_1.default.set(index, 'albums', lodash_1.default.unionBy(lodash_1.default.get(existing, 'albums', []), lodash_1.default.get(index, 'albums', []), 'path'));
         lodash_1.default.set(index, 'items', lodash_1.default.unionBy(lodash_1.default.get(existing, 'items', []), lodash_1.default.get(index, 'items', []), 'path'));
+        lodash_1.default.assignIn(index, metadata);
         indexMap[indexPath] = index;
         // console.log('output index', index);
         const options = {
@@ -70,9 +106,12 @@ const scanPages = (page, basepath) => {
     const folderList = lodash_1.default.fromPairs(lodash_1.default.reject(data, isFile));
     const fileList = lodash_1.default.fromPairs(lodash_1.default.filter(data, isFile));
     // console.log('scanning', {basepath, folderList, fileList})
+    const originalPath = mkPath(["pics/original", basepath]);
     const relativePath = mkPath(["pics/index", basepath, "index.json"]);
     const index = {
-        path: mkPath(["pics/original", basepath]),
+        path: originalPath,
+        thumb: mkPath(["pics/resized/360x225", basepath]),
+        full: mkPath(["pics/resized/1200x750", basepath]),
         title: basepath,
         albums: lodash_1.default.map(folderList, (data, key) => {
             return {
@@ -84,13 +123,13 @@ const scanPages = (page, basepath) => {
         }),
         items: lodash_1.default.map(fileList, (data, key) => {
             return {
-                path: mkPath(["pics/resized/360x225", basepath, key]),
+                path: mkPath([originalPath, key]),
                 type: lodash_1.default.get(data, 'Type'),
             };
         }),
     };
-    // console.log('index', relativePath, index);
-    return makeIndex(relativePath, index)
+    // console.log('index', originalPath, relativePath, index);
+    return makeIndex(originalPath, relativePath, index)
         .then(() => bluebird_1.default.map(lodash_1.default.keys(folderList), (dirname) => {
         return scanPages(lodash_1.default.get(folderList, dirname), mkPath([basepath, dirname]));
     }));

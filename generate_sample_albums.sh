@@ -36,6 +36,8 @@ done
 mkdir -vp ${DIR}/pics/index
 echo "{\
     \"path\": \"pics/original\",\
+    \"thumb\": \"pics/resized/360x225\",\
+    \"full\": \"pics/resized/1200x750\",\
 	\"title\": null,\
 	\"albums\": [\
 		{\
@@ -53,39 +55,27 @@ echo "{\
 	],\
 	\"items\": [\
 		{\
-			\"path\": \"pics/resized/360x225/0.jpg\",\
-			\"full\": \"pics/resized/1200x750/0.jpg\",\
-			\"orig\": \"pics/original/0.jpg\",\
+			\"path\": \"pics/original/0.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/1.jpg\",\
-			\"full\": \"pics/resized/1200x750/1.jpg\",\
-			\"orig\": \"pics/original/1.jpg\",\
+			\"path\": \"pics/original/1.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/2.jpg\",\
-			\"full\": \"pics/resized/1200x750/2.jpg\",\
-			\"orig\": \"pics/original/2.jpg\",\
+			\"path\": \"pics/original/2.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/3.jpg\",\
-			\"full\": \"pics/resized/1200x750/3.jpg\",\
-			\"orig\": \"pics/original/3.jpg\",\
+			\"path\": \"pics/original/3.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/4.jpg\",\
-			\"full\": \"pics/resized/1200x750/4.jpg\",\
-			\"orig\": \"pics/original/4.jpg\",\
+			\"path\": \"pics/original/4.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/5.jpg\",\
-			\"full\": \"pics/resized/1200x750/5.jpg\",\
-			\"orig\": \"pics/original/5.jpg\",\
+			\"path\": \"pics/original/5.jpg\",\
 			\"type\": \"image/jpeg\"\
 		}\
 	]\
@@ -94,43 +84,33 @@ echo "{\
 mkdir -vp ${DIR}/pics/index/album0
 echo "{\
     \"path\": \"pics/original/album0\",\
+    \"thumb\": \"pics/resized/360x225/album0\",\
+    \"full\": \"pics/resized/1200x750/album0\",\
 	\"title\": \"album0\",\
 	\"albums\": [],\
 	\"items\": [\
 		{\
-			\"path\": \"pics/resized/360x225/album0/0.jpg\",\
-			\"full\": \"pics/resized/1200x750/album0/0.jpg\",\
-			\"orig\": \"pics/original/album0/0.jpg\",\
+			\"path\": \"pics/original/album0/0.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album0/1.jpg\",\
-			\"full\": \"pics/resized/1200x750/album0/1.jpg\",\
-			\"orig\": \"pics/original/album0/1.jpg\",\
+			\"path\": \"pics/original/album0/1.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album0/2.jpg\",\
-			\"full\": \"pics/resized/1200x750/album0/2.jpg\",\
-			\"orig\": \"pics/original/album0/2.jpg\",\
+			\"path\": \"pics/original/album0/2.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album0/3.jpg\",\
-			\"full\": \"pics/resized/1200x750/album0/3.jpg\",\
-			\"orig\": \"pics/original/album0/3.jpg\",\
+			\"path\": \"pics/original/album0/3.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album0/4.jpg\",\
-			\"full\": \"pics/resized/1200x750/album0/4.jpg\",\
-			\"orig\": \"pics/original/album0/4.jpg\",\
+			\"path\": \"pics/original/album0/4.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album0/5.jpg\",\
-			\"full\": \"pics/resized/1200x750/album0/5.jpg\",\
-			\"orig\": \"pics/original/album0/5.jpg\",\
+			\"path\": \"pics/original/album0/5.jpg\",\
 			\"type\": \"image/jpeg\"\
 		}\
 	]\
@@ -139,43 +119,33 @@ echo "{\
 mkdir -vp ${DIR}/pics/index/album1
 echo "{\
     \"path\": \"pics/original/album1\",\
+    \"thumb\": \"pics/resized/360x225/album1\",\
+    \"full\": \"pics/resized/1200x750/album1\",\
 	\"title\": \"album1\",\
 	\"albums\": [],\
 	\"items\": [\
 		{\
-			\"path\": \"pics/resized/360x225/album1/0.jpg\",\
-			\"full\": \"pics/resized/1200x750/album1/0.jpg\",\
-			\"orig\": \"pics/original/album1/0.jpg\",\
+			\"path\": \"pics/original/album1/0.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album1/1.jpg\",\
-			\"full\": \"pics/resized/1200x750/album1/1.jpg\",\
-			\"orig\": \"pics/original/album1/1.jpg\",\
+			\"path\": \"pics/original/album1/1.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album1/2.jpg\",\
-			\"full\": \"pics/resized/1200x750/album1/2.jpg\",\
-			\"orig\": \"pics/original/album1/2.jpg\",\
+			\"path\": \"pics/original/album1/2.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album1/3.jpg\",\
-			\"full\": \"pics/resized/1200x750/album1/3.jpg\",\
-			\"orig\": \"pics/original/album1/3.jpg\",\
+			\"path\": \"pics/original/album1/3.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album1/4.jpg\",\
-			\"full\": \"pics/resized/1200x750/album1/4.jpg\",\
-			\"orig\": \"pics/original/album1/4.jpg\",\
+			\"path\": \"pics/original/album1/4.jpg\",\
 			\"type\": \"image/jpeg\"\
 		},\
 		{\
-			\"path\": \"pics/resized/360x225/album1/5.jpg\",\
-			\"full\": \"pics/resized/1200x750/album1/5.jpg\",\
-			\"orig\": \"pics/original/album1/5.jpg\",\
+			\"path\": \"pics/original/album1/5.jpg\",\
 			\"type\": \"image/jpeg\"\
 		}\
 	]\

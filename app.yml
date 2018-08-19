@@ -167,14 +167,14 @@ Resources:
                   - 'arn:aws:s3:::${resizedBucket}/*'
                   - resizedBucket: !Ref resizedBucket
                 Action: ['s3:PutObject', 's3:DeleteObject']
-        - PolicyName: ResizeLambdaInvalidateDistribution
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Resource: '*'
-                Action:
-                  - cloudfront:CreateInvalidation
-                  - cloudfront:ListDistributions
+#        - PolicyName: ResizeLambdaInvalidateDistribution
+#          PolicyDocument:
+#            Statement:
+#              - Effect: Allow
+#                Resource: '*'
+#                Action:
+#                  - cloudfront:CreateInvalidation
+#                  - cloudfront:ListDistributions
         - PolicyName: TranscoderLambdaExecutionPolicy
           PolicyDocument:
             Statement:
@@ -196,6 +196,7 @@ Resources:
       Role: !GetAtt IndexLambdaRole.Arn
       Environment:
         Variables:
+          ORIGINAL_BUCKET: !Ref sourceBucket
           INDEX_BUCKET: !Ref indexBucket
           CLOUDFRONT_DISTRIBUTION_DOMAIN:
             !GetAtt WebDistribution.DomainName
@@ -205,7 +206,7 @@ Resources:
   #
   # Index IAM role so the Lambda can log (CloudWatch) and read/write S3 objects
   #
-  ResizeLambdaRole:
+  IndexLambdaRole:
     Type: AWS::IAM::Role
     Properties:
       Path: /
@@ -227,15 +228,15 @@ Resources:
                 Resource: !Sub
                   - 'arn:aws:s3:::${sourceBucket}/*'
                   - sourceBucket: !Ref sourceBucket
-                Action: ['s3:ListObject']
+                Action: ['s3:ListBucket']
         - PolicyName: IndexLambdaPutIndex
           PolicyDocument:
             Statement:
               - Effect: Allow
                 Resource: !Sub
                   - 'arn:aws:s3:::${indexBucket}/*'
-                  - indexBucket: !Ref indexBucket
-                Action: ['s3:PutObject', 's3:DeleteObject']
+                  - sourceBucket: !Ref indexBucket
+                Action: ['s3:ListBucket', 's3:PutObject', 's3:DeleteObject']
         - PolicyName: IndexLambdaInvalidateDistribution
           PolicyDocument:
             Statement:
@@ -330,6 +331,16 @@ Resources:
       SourceArn: !Sub
         - arn:aws:s3:::${sourceBucket}
         - sourceBucket: !Ref sourceBucket
+  IndexInvokePermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        Action: lambda:InvokeFunction
+        FunctionName: !Ref IndexFunction
+        Principal: s3.amazonaws.com
+        SourceAccount: !Ref AWS::AccountId
+        SourceArn: !Sub
+          - arn:aws:s3:::${sourceBucket}
+          - sourceBucket: !Ref sourceBucket
   SourceBucket:
     Type: AWS::S3::Bucket
     DependsOn: ResizeInvokePermission
@@ -459,6 +470,7 @@ Resources:
 
   #
   # CloudFront Distribution
+  # https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_CreateDistribution.html#API_CreateDistribution_RequestSyntax
   #
   WebDistribution:
     Type: AWS::CloudFront::Distribution
@@ -475,6 +487,11 @@ Resources:
               OriginAccessIdentity: !Sub
                 - origin-access-identity/cloudfront/${id}
                 - id: !Ref originAccessIdentity
+#            CustomOriginConfig:
+#              OriginProtocolPolicy: https-only
+#              OriginSSLProtocols:
+#                - 'TLSv1.2'
+#                - 'SSLv3'
           - DomainName: !Sub
               - ${sourceBucket}.s3.amazonaws.com
               - sourceBucket: !Ref sourceBucket
@@ -483,6 +500,11 @@ Resources:
               OriginAccessIdentity: !Sub
                 - origin-access-identity/cloudfront/${id}
                 - id: !Ref originAccessIdentity
+#            CustomOriginConfig:
+#              OriginProtocolPolicy: https-only
+#              OriginSSLProtocols:
+#                - 'TLSv1.2'
+#                - 'SSLv3'
           - DomainName: !Sub
               - ${webBucket}.s3.amazonaws.com
               - webBucket: !Ref webBucket
@@ -491,6 +513,23 @@ Resources:
               OriginAccessIdentity: !Sub
                 - origin-access-identity/cloudfront/${id}
                 - id: !Ref originAccessIdentity
+#            CustomOriginConfig:
+#              OriginProtocolPolicy: https-only
+#              OriginSSLProtocols:
+#                - 'TLSv1.2'
+#                - 'SSLv3'
+          - DomainName: !Sub
+              - ${apiID}.execute-api.${AWS::Region}.amazonaws.com
+              - apiID: !Ref ServerlessRestApi
+            Id: Custom-LoginAPI
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+#            CustomOriginConfig:
+#              OriginProtocolPolicy: https-only
+#              OriginSSLProtocols:
+#                - 'TLSv1.2'
+#                - 'SSLv3'
+          # index
           - DomainName: !Sub
               - ${indexBucket}.s3.amazonaws.com
               - indexBucket: !Ref indexBucket
@@ -499,12 +538,11 @@ Resources:
               OriginAccessIdentity: !Sub
                 - origin-access-identity/cloudfront/${id}
                 - id: !Ref originAccessIdentity
-          - DomainName: !Sub
-              - ${apiID}.execute-api.${AWS::Region}.amazonaws.com
-              - apiID: !Ref ServerlessRestApi
-            Id: Custom-LoginAPI
-            CustomOriginConfig:
-              OriginProtocolPolicy: https-only
+#            CustomOriginConfig:
+#              OriginProtocolPolicy: https-only
+#              OriginSSLProtocols:
+#                - 'TLSv1.2'
+#                - 'SSLv3'
         CacheBehaviors:
           - TargetOriginId: S3-ResizedBucket
             TrustedSigners:
@@ -565,3 +603,13 @@ Resources:
         ViewerCertificate:
           AcmCertificateArn: !If [ createSSLCert, !Ref SSLCert, !Ref sslCertificateArn ]
           SslSupportMethod: sni-only
+        HttpVersion: 'http2'
+        Restrictions:
+          GeoRestriction:
+            Locations:
+              - 'IT'
+              - 'NZ'
+            RestrictionType: 'whitelist'
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: 'true'
+          MinimumProtocolVersion: 'TLSv1.2_2018'

@@ -182,8 +182,11 @@ const processBucket = () => {
         }).then((newToken) => {
             if (newToken)
                 return cycle(newToken);
+            else
+                console.log('processBucket ended');
         });
     };
+    console.log('processBucket started');
     return cycle().then(() => result);
 };
 const emptyBucket = () => {
@@ -221,8 +224,11 @@ const emptyBucket = () => {
         }).then((newToken) => {
             if (newToken)
                 return cycle(newToken);
+            else
+                console.log('emptyBucket ended');
         });
     };
+    console.log('emptyBucket started');
     return cycle();
 };
 const invalidateCloudFront = () => new bluebird_1.default((resolve, reject) => {

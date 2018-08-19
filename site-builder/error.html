@@ -173,7 +173,7 @@
   </head>
   <body>
     <div class="wrapper">
-      <form class="login" id="loginForm" action="https://{website}/Prod/login">
+      <form class="login" id="loginForm" action="/Prod/login">
         <p class="title">Error – Are You Logged In?</p>
         <input id="username" type="text" placeholder="Username" autofocus/>
         <i class="fa fa-user"></i>
@@ -215,7 +215,7 @@
           $this.addClass('ok');
           $state.html('Loading Site...');
           setTimeout(function() {
-            window.location.replace("https://{website}");
+            window.location.reload();
           }, 1000);
         },
         error: function(XMLHttpRequest, textStatus, errorThrown) {

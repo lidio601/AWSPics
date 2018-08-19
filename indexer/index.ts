@@ -211,9 +211,11 @@ const processBucket = (): Promise<object[]> => {
             })
         }).then((newToken: NextToken|undefined) => {
             if (newToken) return cycle(newToken);
+            else console.log('processBucket ended');
         })
     };
 
+    console.log('processBucket started');
     return cycle().then(() => result);
 };
 
@@ -252,9 +254,11 @@ const emptyBucket = () : Promise<void> => {
             })
         }).then((newToken: NextToken|undefined) => {
             if (newToken) return cycle(newToken);
+            else console.log('emptyBucket ended');
         })
     };
 
+    console.log('emptyBucket started');
     return cycle();
 };
 

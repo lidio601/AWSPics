@@ -13,7 +13,8 @@ fi
 output_template_file=$(mktemp)
 stackName="AWSPics"
 
-for function in login resize indexer site-builder; do
+#  site-builder
+for function in login resize indexer; do
   (
     cd $function
     docker build -t "cloudformation-lambda-$function" .

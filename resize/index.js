@@ -12,13 +12,13 @@ const path_1 = __importDefault(require("path"));
 const PIPELINE_ID = process.env.PIPELINE_ID || "";
 const PRESET360_ID = process.env.PRESET360_ID || "";
 const PRESET1200_ID = process.env.PRESET1200_ID || "";
-const distributionDomain = process.env.CLOUDFRONT_DISTRIBUTION_DOMAIN || "";
+//const distributionDomain = process.env.CLOUDFRONT_DISTRIBUTION_DOMAIN || "";
 const bucketName = process.env.RESIZED_BUCKET || "";
 const im = gm_1.default.subClass({
     imageMagick: true,
 });
 const s3 = new aws_sdk_1.default.S3();
-const cloudfront = new aws_sdk_1.default.CloudFront();
+//const cloudfront = new AWS.CloudFront();
 const sizes = ["1200x750", "360x225"];
 const elastictranscoder = new aws_sdk_1.default.ElasticTranscoder({ apiVersion: '2012-09-25' });
 const getImageType = (objectContentType) => {
@@ -46,19 +46,21 @@ const cross = (left, right) => {
     });
     return res;
 };
-function invalidateCloudFront(cb) {
-    cloudfront.listDistributions((err, data) => {
+/*function invalidateCloudFront(cb: (err: Error|null) => void) {
+    cloudfront.listDistributions((err: AWSError, data: any) => {
         // Handle error
         if (err) {
-            console.log(err, err.stack);
+            console.log(err, err.stack)
             return;
         }
+
         // Get distribution ID from domain name
-        const distributionID = data.Items.find((d) => {
-            return d.DomainName === distributionDomain;
-        }).Id;
+        const distributionID = data.Items.find((d: any) => {
+            return d.DomainName === distributionDomain
+        }).Id
+
         // Create invalidation
-        console.log("Cloudfront invalidating /*");
+        console.log("Cloudfront invalidating /*")
         cloudfront.createInvalidation({
             DistributionId: distributionID,
             InvalidationBatch: {
@@ -68,13 +70,12 @@ function invalidateCloudFront(cb) {
                     Quantity: 1,
                 },
             },
-        }, (err) => {
-            if (err)
-                console.log(err, err.stack);
+        }, (err: AWSError) => {
+            if (err) console.log(err, err.stack);
             cb(err);
-        });
-    });
-}
+        })
+    })
+}*/
 /*
  * Sample event put
 {
@@ -259,15 +260,21 @@ function handler(event, context) {
             context.fail(err);
         else {
             handleDeleteEvent(deleteRecords, (err) => {
+                /*
+                //
+                // Cloudfront invalidation costs are too expensive
+                // to do this at every image upload!
+                //
+                if (err) context.fail(err);
+                else invalidateCloudFront((err3: Error|null) => {
+                    if (err3) context.fail(err3);
+                    else context.succeed()
+                });
+                */
                 if (err)
                     context.fail(err);
                 else
-                    invalidateCloudFront((err3) => {
-                        if (err3)
-                            context.fail(err);
-                        else
-                            context.succeed();
-                    });
+                    context.succeed();
             });
         }
     });

@@ -8,13 +8,13 @@ import path from "path";
 const PIPELINE_ID = process.env.PIPELINE_ID || "";
 const PRESET360_ID = process.env.PRESET360_ID || "";
 const PRESET1200_ID = process.env.PRESET1200_ID || "";
-const distributionDomain = process.env.CLOUDFRONT_DISTRIBUTION_DOMAIN || "";
+//const distributionDomain = process.env.CLOUDFRONT_DISTRIBUTION_DOMAIN || "";
 const bucketName = process.env.RESIZED_BUCKET || "";
 const im = gm.subClass({
     imageMagick: true,
 });
 const s3 = new AWS.S3();
-const cloudfront = new AWS.CloudFront();
+//const cloudfront = new AWS.CloudFront();
 const sizes = ["1200x750", "360x225"];
 const elastictranscoder = new AWS.ElasticTranscoder({apiVersion: '2012-09-25'});
 
@@ -50,7 +50,7 @@ const cross = (left, right): any[] => {
     return res;
 };
 
-function invalidateCloudFront(cb: (err: Error|null) => void) {
+/*function invalidateCloudFront(cb: (err: Error|null) => void) {
     cloudfront.listDistributions((err: AWSError, data: any) => {
         // Handle error
         if (err) {
@@ -79,7 +79,7 @@ function invalidateCloudFront(cb: (err: Error|null) => void) {
             cb(err);
         })
     })
-}
+}*/
 
 /*
  * Sample event put
@@ -269,11 +269,21 @@ export function handler(event: any, context: any): void {
         if (err) context.fail(err);
         else {
             handleDeleteEvent(deleteRecords, (err?: Error | null) => {
+
+                /*
+                //
+                // Cloudfront invalidation costs are too expensive
+                // to do this at every image upload!
+                //
                 if (err) context.fail(err);
                 else invalidateCloudFront((err3: Error|null) => {
-                    if (err3) context.fail(err);
+                    if (err3) context.fail(err3);
                     else context.succeed()
                 });
+                */
+
+                if (err) context.fail(err);
+                else context.succeed()
             })
         }
     });

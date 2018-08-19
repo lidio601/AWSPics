@@ -128,8 +128,8 @@ Resources:
           PRESET360_ID:
             Ref: transcoderPresetID
           RESIZED_BUCKET: !Ref resizedBucket
-          CLOUDFRONT_DISTRIBUTION_DOMAIN:
-            !GetAtt WebDistribution.DomainName
+#          CLOUDFRONT_DISTRIBUTION_DOMAIN:
+#            !GetAtt WebDistribution.DomainName
       Timeout: 30
       MemorySize: 1024
 

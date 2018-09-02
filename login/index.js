@@ -3,6 +3,8 @@ const AWS = require('aws-sdk')
 const async = require('async')
 const htpasswd = require('htpasswd-auth')
 const cloudfront = require('aws-cloudfront-sign')
+const {OAuth2Client} = require('google-auth-library');
+const _ = require('lodash')
 
 // --------------
 // Lambda function parameters, as environment variables
@@ -16,6 +18,26 @@ const CONFIG_KEYS = {
   htpasswd: 'ENCRYPTED_HTPASSWD'
 }
 
+/*
+ * Google auth
+ */
+
+const GOOGLE_OAUTH_CLIENTID = undefined // process.env.CLIENT_ID
+const allowedUsers = _.split(_.defaultTo(process.env.EMAIL_ACCOUNT, ''), ',')
+const client = new OAuth2Client(GOOGLE_OAUTH_CLIENTID)
+async function verify (token) {
+  const ticket = await client.verifyIdToken({
+    idToken: token,
+    audience: GOOGLE_OAUTH_CLIENTID
+  })
+
+  const payload = ticket.getPayload()
+  const email = _.get(payload, 'email')
+  console.log('user email', email, allowedUsers)
+
+  return _.indexOf(allowedUsers, email) !== -1
+}
+
 // --------------
 // Main function exported to Lambda
 // Checks username/password against the <htaccess> entries
@@ -23,7 +45,7 @@ const CONFIG_KEYS = {
 
 exports.handler = (event, context, callback) => {
   const body = parsePayload(event.body)
-  if (!body || !body.username || !body.password) {
+  if (!body || ((!body.username || !body.password) && !body.token)) {
     return callback(null, {
       statusCode: 400,
       body: 'Bad request'
@@ -37,8 +59,17 @@ exports.handler = (event, context, callback) => {
         body: 'Server error'
       })
     } else {
-      // validate username and password
-      htpasswd.authenticate(body.username, body.password, config.htpasswd).then((authenticated) => {
+      let ok
+
+      if (!_.isEmpty(body.token)) {
+        // validate via Google oauth
+        ok = verify(body.token)
+      } else {
+        // validate username and password
+        ok = htpasswd.authenticate(body.username, body.password, config.htpasswd)
+      }
+
+      ok.then((authenticated) => {
         if (authenticated) {
           console.log('Successful login for: ' + body.username)
           var responseHeaders = cookiesHeaders(config)

@@ -52,10 +52,11 @@
 
       $container.empty();
 
-      $title.html(response.title);
+      $title.html(_.get(response, 'title', ''));
 
       var albums = _.get(response, 'albums', []);
-      if (!_.size(albums)) {
+      var items  = _.get(response, 'items', []);
+      if (!_.size(albums) && _.size(items)) {
         window.location.href = '/album/index.html?i=' + indexUrl;
         return;
       }

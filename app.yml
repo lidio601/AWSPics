@@ -54,6 +54,9 @@ Parameters:
   transcoderPresetID:
     Description: Elastic Transcoder Preset ID.
     Type: String
+  emailAccountList:
+    Description: Comma separated list of Google email account allowed
+    Type: String
 
 Conditions:
   createSSLCert: !Equals [ !Ref sslCertificateArn, "" ]
@@ -77,6 +80,7 @@ Resources:
           CLOUDFRONT_KEYPAIR_ID: !Ref cloudFrontKeypairId
           ENCRYPTED_CLOUDFRONT_PRIVATE_KEY: !Ref encryptedCloudFrontPrivateKey
           ENCRYPTED_HTPASSWD: !Ref encryptedHtpasswd
+          EMAIL_ACCOUNT: !Ref emailAccountList
       Events:
         GetResource:
           Type: Api

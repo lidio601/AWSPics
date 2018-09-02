@@ -6,7 +6,6 @@
     <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
-
     <style>
     body {
       font-family: "Open Sans", sans-serif;
@@ -170,6 +169,9 @@
     }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prefixfree/1.0.7/prefixfree.min.js"></script>
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <!-- https://developers.google.com/identity/sign-in/web/sign-in -->
+    <meta name="google-signin-client_id" content="GOOGLE_APP_ID.apps.googleusercontent.com">
   </head>
   <body>
     <div class="wrapper">
@@ -179,19 +181,24 @@
         <i class="fa fa-user"></i>
         <input id="password" type="password" placeholder="Password" />
         <i class="fa fa-key"></i>
-        <button>
-        <i class="spinner"></i>
-        <span class="state">Log In</span>
+        <button id="submit">
+          <i class="spinner"></i>
+          <span class="state">Log In</span>
         </button>
+        <input id="token" type="hidden" name="token" value="">
+        <div class="g-signin2" data-onsuccess="onSignIn"></div>
       </form>
     </p>
   </div>
   <script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>
   <script type="text/javascript">
+
+    // redirect non HTTPS
     var loc = window.location.href+'';
     if (loc.indexOf('http://')==0){
         window.location.href = loc.replace('http://','https://');
     }
+
     var working = false;
     $('.login').on('submit', function(e) {
       e.preventDefault();
@@ -204,7 +211,11 @@
       $.ajax({
         url: $(this).attr("action"),
         type: "POST",
-        data: JSON.stringify({username: $("#username").val(), password: $("#password").val()}),
+        data: JSON.stringify({
+          username: $("#username").val(),
+          password: $("#password").val(),
+          token: $("#token").val()
+        }),
         contentType: "application/json",
         dataType: "json",
         success: function(data) {
@@ -231,6 +242,20 @@
         }
       });
     });
+
+    function onSignIn(googleUser) {
+      var id_token = googleUser.getAuthResponse().id_token;
+      var profile = googleUser.getBasicProfile();
+      console.log('Token: ' + id_token); // Do not send to your backend! Use an ID token instead.
+      console.log('ID: ' + profile.getId()); // Do not send to your backend! Use an ID token instead.
+      console.log('Name: ' + profile.getName());
+      console.log('Image URL: ' + profile.getImageUrl());
+      console.log('Email: ' + profile.getEmail()); // This is null if the 'email' scope is not present.
+      $("#token").val(id_token);
+      $("#username").val(profile.getEmail());
+      $("#password").val(id_token);
+      $("#submit").click();
+    }
   </script>
 </body>
 </html>

@@ -61,9 +61,9 @@
 
       $container.empty();
 
-      $title.html(response.title);
-      $comment1.html(response.comment1);
-      $comment2.html(response.comment2);
+      $title.html(_.get(response, 'title', ''));
+      $comment1.html(_.get(response, 'comment1', ''));
+      $comment2.html(_.get(response, 'comment2', ''));
 
       var albums = _.get(response, 'albums', []);
       var parentUrl = indexUrl;
@@ -92,8 +92,11 @@
           "</article>").appendTo($container);
       });
 
-      $("img.lazy").lazyload();
-      main.init();
+      if (_.size(items) > 0) {
+        $("img.lazy").lazyload();
+        main.init();
+      }
+
     });
 </script>
 </body>

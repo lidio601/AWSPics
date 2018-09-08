@@ -18,21 +18,31 @@ const s3 = new AWS.S3();
 const sizes = ["1200x750", "360x225"];
 const elastictranscoder = new AWS.ElasticTranscoder({apiVersion: '2012-09-25'});
 
-const getImageType = (objectContentType): string => {
-    const res: string | null = mime.getExtension(objectContentType);
+const getImageType = (objectContentType: string, objectPath: string): string => {
+    let res: string | null = mime.getExtension(objectContentType);
     if (!_.startsWith(objectContentType, "image")) {
-        console.log("unsupported objectContentType " + objectContentType);
-        return "";
+        const res2: string = _.toString(mime.getType(objectPath));
+        if (!_.startsWith(res2, "image")) {
+            console.log("unsupported objectContentType " + objectContentType + " with path " + objectPath);
+            return "";
+        } else {
+            res = mime.getExtension(res2);
+        }
     }
 
     return res || "";
 };
 
-const getVideoType = (objectContentType: string): string => {
+const getVideoType = (objectContentType: string, objectPath: string): string => {
     const res: string | null = mime.getExtension(objectContentType);
     if (!_.startsWith(objectContentType, "video")) {
-        console.log("unsupported objectContentType " + objectContentType);
-        return "";
+        const res2: string = _.toString(mime.getType(objectPath));
+        if (!_.startsWith(res2, "video")) {
+            console.log("unsupported objectContentType " + objectContentType + " with path " + objectPath);
+            return "";
+        } else {
+            res = mime.getExtension(res2);
+        }
     }
 
     return res || "";
@@ -115,8 +125,8 @@ function handlePutEvent(records: object[], cb: (err1?: Error|null) => void): voi
             if (err) {
                 cb(null, {} /*err*/);
             } else {
-                const imageType = getImageType(data.ContentType);
-                const videoType = getVideoType(data.ContentType);
+                const imageType = getImageType(data.ContentType, originalKey);
+                const videoType = getVideoType(data.ContentType, originalKey);
                 if (_.isEmpty(imageType) && _.isEmpty(videoType)) cb(null)
                 else cb(null, {
                     buffer: data.Body,
@@ -260,8 +270,8 @@ export function handler(event: any, context: any): void {
     console.log("event ", JSON.stringify(event));
 
     const records = event.Records || [];
-    const putRecords = _.filter(records, r => _.isEqual(_.get(r, "eventName"), "ObjectCreated:Put"))
-    const deleteRecords = _.filter(records, r => _.isEqual(_.get(r, "eventName"), "ObjectRemoved:Delete"))
+    const putRecords = _.filter(records, r => _.startsWith(_.get(r, "eventName"), "ObjectCreated:"))
+    const deleteRecords = _.filter(records, r => _.startsWith(_.get(r, "eventName"), "ObjectRemoved:"))
     console.log("got", _.size(putRecords), "records on put");
     console.log("got", _.size(deleteRecords), "records on delete");
 

@@ -40,55 +40,101 @@
 <script src="assets/js/jquery.lazyload.js"></script>
 <script type="text/javascript" charset="utf-8">
 
-  var indexUrl = _.defaultTo($.fn.queryParam('i'), '/pics/index/index.json');
+  var indexUrl   = _.defaultTo($.fn.queryParam('i'), '/pics/index/index.json');
   var $container = $('.js-thumb-list');
-  var $title = $('.js-album-title');
-  var $comment1 = $('.js-comment-1');
-  var $comment2 = $('.js-comment-2');
-  var $backURl = $('.js-back-url');
+  var $title     = $('.js-album-title');
+  var $comment1  = $('.js-comment-1');
+  var $comment2  = $('.js-comment-2');
+  var $backURL   = $('.js-back-url');
 
-  function mkPath (path) {
-      return _.join(path, "/")
+  function mkPath(path) {
+    return _.join(path, "/")
   }
 
-  function basename (path) {
-      return _.last(_.split(path, "/"));
+  function basename(path) {
+    return _.last(_.split(path, "/"));
   }
 
   $.getJSON(indexUrl)
-    .then(function (response) {
+    .success(function (response) {
       console.log(response);
 
       $container.empty();
 
-      $title.html(_.get(response, 'title', ''));
+      var titleText = _.get(response, 'title', 'This album');
+      console.log('album:', titleText);
+      $title.html(titleText);
+
       $comment1.html(_.get(response, 'comment1', ''));
       $comment2.html(_.get(response, 'comment2', ''));
 
       var albums = _.get(response, 'albums', []);
-      var parentUrl = indexUrl;
-      if (!_.size(albums)) {
-        // get parent index path
-        parentUrl = _.join(_.initial(_.initial(_.split(parentUrl, "/"))), "/") + "/index.json"
-      }
-      $backURl.attr('href', '/index.html?i=' + parentUrl);
-
       var items = _.get(response, 'items', []);
+      console.log(_.size(albums), 'nested albums');
+      console.log(_.size(items), 'items');
+
+      var parentUrl;
+      if (!_.size(albums)) {
+        // redirect to album list with parent index
+        parentUrl = _.join(_.initial(_.initial(_.split(indexUrl, "/"))), "/") + "/index.json"
+      } else {
+        // redirect to album list with this index
+        parentUrl = indexUrl
+      }
+      $backURL.attr('href', '/index.html?i=' + parentUrl);
+      console.log("parent url", parentUrl);
+
+      $.getJSON(parentUrl)
+        .success(function (response) {
+          var parentTitleText = _.get(response, 'title', false);
+          if (parentTitleText) {
+            $backURL.text('Back to ' + parentTitleText);
+          }
+        });
+
       _.each(items, function (item) {
+        var type = item.type;
         var filename = basename(item.path);
         var fullUrl = mkPath([response.full, filename]);
         var thumbUrl = mkPath([response.thumb, filename]);
+        var inset = "";
+
+        if (_.startsWith(type, "audio")) {
+          inset = "" +
+            "<audio controls preload=\"none\">" +
+            "   <source src=\"" + item.path + "\" type=\"" + type + "\">" +
+            "</audio>" +
+          "";
+
+          thumbUrl = fullUrl = "album/assets/css/images/placeholder.png";
+        } else if (_.startsWith(type, "video")) {
+          inset = "" +
+            "<video controls>" +
+            "  <source src=\"" + item.path + "\" type=\"" + type + "\"/>" +
+            "</video>" +
+          "";
+
+          thumbUrl = _.join(_.union(_.initial(_.split(thumbUrl, '.')), ['gif']), '.')
+          fullUrl = "album/assets/css/images/placeholder.png";
+        }
+
+        console.log("rendering item", item, {
+          fullUrl: fullUrl,
+          thumbUrl: thumbUrl
+        })
+
         $("<article>" +
-            "<a class=\"thumbnail\" href=\"/" + fullUrl + "\" data-position=\"center\">" +
-                "<img class=\"lazy\" " +
-                  "src=\"assets/css/images/placeholder.png\" " +
-                  "data-original=\"/" + thumbUrl + "\" width=\"360\" height=\"225\"/>" +
-            "</a>" +
-            "<p>" +
-                "<a href=\"/" + item.path + "\" download>" +
+              "<a class=\"thumbnail\" href=\"/" + fullUrl + "\" data-position=\"center\">" +
+                  "<img class=\"lazy\" " +
+                      "src=\"assets/css/images/placeholder.png\" " +
+                      "data-original=\"/" + thumbUrl + "\" width=\"360\" height=\"225\"/>" +
+              "</a>" +
+              inset +
+              "<p>" +
+                  "<a href=\"/" + item.path + "\" download>" +
                     "High Resolution Download" +
-                "</a>" +
-            "</p>" +
+                  "</a>" +
+              "</p>" +
           "</article>").appendTo($container);
       });
 
@@ -97,6 +143,12 @@
         main.init();
       }
 
+    })
+    .fail(function (xhr, err) {
+      console.error(err);
+
+      $container.empty();
+      $title.text(_.get(err, 'message', 'Generic error'));
     });
 </script>
 </body>

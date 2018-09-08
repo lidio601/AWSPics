@@ -21,19 +21,31 @@ const s3 = new aws_sdk_1.default.S3();
 //const cloudfront = new AWS.CloudFront();
 const sizes = ["1200x750", "360x225"];
 const elastictranscoder = new aws_sdk_1.default.ElasticTranscoder({ apiVersion: '2012-09-25' });
-const getImageType = (objectContentType) => {
-    const res = mime_1.default.getExtension(objectContentType);
+const getImageType = (objectContentType, objectPath) => {
+    let res = mime_1.default.getExtension(objectContentType);
     if (!lodash_1.default.startsWith(objectContentType, "image")) {
-        console.log("unsupported objectContentType " + objectContentType);
-        return "";
+        const res2 = lodash_1.default.toString(mime_1.default.getType(objectPath));
+        if (!lodash_1.default.startsWith(res2, "image")) {
+            console.log("unsupported objectContentType " + objectContentType + " with path " + objectPath);
+            return "";
+        }
+        else {
+            res = mime_1.default.getExtension(res2);
+        }
     }
     return res || "";
 };
-const getVideoType = (objectContentType) => {
+const getVideoType = (objectContentType, objectPath) => {
     const res = mime_1.default.getExtension(objectContentType);
     if (!lodash_1.default.startsWith(objectContentType, "video")) {
-        console.log("unsupported objectContentType " + objectContentType);
-        return "";
+        const res2 = lodash_1.default.toString(mime_1.default.getType(objectPath));
+        if (!lodash_1.default.startsWith(res2, "video")) {
+            console.log("unsupported objectContentType " + objectContentType + " with path " + objectPath);
+            return "";
+        }
+        else {
+            res = mime_1.default.getExtension(res2);
+        }
     }
     return res || "";
 };
@@ -111,8 +123,8 @@ function handlePutEvent(records, cb) {
                 cb(null, {} /*err*/);
             }
             else {
-                const imageType = getImageType(data.ContentType);
-                const videoType = getVideoType(data.ContentType);
+                const imageType = getImageType(data.ContentType, originalKey);
+                const videoType = getVideoType(data.ContentType, originalKey);
                 if (lodash_1.default.isEmpty(imageType) && lodash_1.default.isEmpty(videoType))
                     cb(null);
                 else
@@ -251,8 +263,8 @@ function handleDeleteEvent(records, cb) {
 function handler(event, context) {
     console.log("event ", JSON.stringify(event));
     const records = event.Records || [];
-    const putRecords = lodash_1.default.filter(records, r => lodash_1.default.isEqual(lodash_1.default.get(r, "eventName"), "ObjectCreated:Put"));
-    const deleteRecords = lodash_1.default.filter(records, r => lodash_1.default.isEqual(lodash_1.default.get(r, "eventName"), "ObjectRemoved:Delete"));
+    const putRecords = lodash_1.default.filter(records, r => lodash_1.default.startsWith(lodash_1.default.get(r, "eventName"), "ObjectCreated:"));
+    const deleteRecords = lodash_1.default.filter(records, r => lodash_1.default.startsWith(lodash_1.default.get(r, "eventName"), "ObjectRemoved:"));
     console.log("got", lodash_1.default.size(putRecords), "records on put");
     console.log("got", lodash_1.default.size(deleteRecords), "records on delete");
     handlePutEvent(putRecords, (err) => {

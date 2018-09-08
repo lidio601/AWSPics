@@ -908,4 +908,33 @@ dl {
         transition-delay: 0.5s;
         opacity: 1; } }
 
-/*# sourceMappingURL=main.css.map */
+@media (min-width: 1024px) {
+  .caption audio {
+    left: 33%;
+    position: relative;
+    top: -150px;
+  }
+
+  .caption video {
+    left: 19%;
+    position: relative;
+    top: calc(-6vh);
+  }
+}
+
+@media (max-width: 1023px) {
+  .caption audio {
+    left: 10%;
+    position: absolute;
+    top: calc(-31vh);
+  }
+
+  .caption video {
+    position: absolute;
+    left: 0;
+    top: calc(-78vh);
+    display: block;
+    width: 100%;
+    height: calc(80vh);
+  }
+}

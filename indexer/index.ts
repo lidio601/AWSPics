@@ -18,6 +18,7 @@ const yamlMap: object = {};
 
 const isImage = (type: string): boolean => _.startsWith(type, 'image');
 const isVideo = (type: string): boolean => _.startsWith(type, 'video');
+const isAudio = (type: string): boolean => _.startsWith(type, 'audio');
 const isFile  = (item: object): boolean => _.get(item, '1.File', false);
 const mkPath  = (path: (string|undefined)[]): string => _.join(_.filter(path), "/")
 
@@ -116,6 +117,25 @@ const makeIndex = (albumPath: string, indexPath: string, index: object): Bluebir
     })
 };
 
+const findFirstImage = (fileList: object, folderList?: object): string => {
+    // get the first image from the file list
+    const firstImageItem: object = _.first(_.filter(fileList, (item: object): boolean =>
+        isImage(_.get(item, 'Type'))));
+    if (firstImageItem) {
+        return _.get(firstImageItem, 'Key')
+    }
+
+    let result :string = '';
+    _.each(folderList, (item: object, key: string): boolean => {
+        result = findFirstImage(item);
+        if (!_.isEmpty(result)) {
+            return false;
+        }
+    });
+
+    return result;
+}
+
 const scanPages = (page: object, basepath?: string): Bluebird<any> => {
     const data: object = _.toPairs(page)
     const folderList: object = _.fromPairs(_.reject(data, isFile))
@@ -126,8 +146,6 @@ const scanPages = (page: object, basepath?: string): Bluebird<any> => {
     const relativePath = mkPath(["pics/index", basepath, "index.json"])
     const index = {
         path: originalPath,
-        thumb: mkPath(["pics/resized/360x225", basepath]),
-        full: mkPath(["pics/resized/1200x750", basepath]),
         title: basepath,
         albums: _.map(folderList, (data: object, key: string) => {
             return {
@@ -137,6 +155,9 @@ const scanPages = (page: object, basepath?: string): Bluebird<any> => {
                 index: mkPath(["pics/index", basepath, key, "index.json"]),
             }
         }),
+        thumb: mkPath(["pics/resized/360x225", basepath]),
+        full: mkPath(["pics/resized/1200x750", basepath]),
+        cover: findFirstImage(fileList, folderList),
         items: _.map(fileList, (data: object, key: string) => {
             return {
                 path: mkPath([originalPath, key]),
@@ -163,7 +184,7 @@ const processPage = (page: object[]): Bluebird<any> => {
         item.Type = mime.getType(_.get(item, 'Key'))
         item.Path = _.split(key, '/')
         // !_.isNull(item.Type) && (item.Path = _.initial(item.Path))
-        item.Valid = isImage(item.Type) || isVideo(item.Type)
+        item.Valid = isImage(item.Type) || isVideo(item.Type) || isAudio(item.Type)
         item.File = !_.isNull(item.Type)
     })
 

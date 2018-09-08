@@ -17,6 +17,7 @@ const indexMap = {};
 const yamlMap = {};
 const isImage = (type) => lodash_1.default.startsWith(type, 'image');
 const isVideo = (type) => lodash_1.default.startsWith(type, 'video');
+const isAudio = (type) => lodash_1.default.startsWith(type, 'audio');
 const isFile = (item) => lodash_1.default.get(item, '1.File', false);
 const mkPath = (path) => lodash_1.default.join(lodash_1.default.filter(path), "/");
 const getAlbumMetadata = (path) => {
@@ -101,6 +102,21 @@ const makeIndex = (albumPath, indexPath, index) => {
         });
     });
 };
+const findFirstImage = (fileList, folderList) => {
+    // get the first image from the file list
+    const firstImageItem = lodash_1.default.first(lodash_1.default.filter(fileList, (item) => isImage(lodash_1.default.get(item, 'Type'))));
+    if (firstImageItem) {
+        return lodash_1.default.get(firstImageItem, 'Key');
+    }
+    let result = '';
+    lodash_1.default.each(folderList, (item, key) => {
+        result = findFirstImage(item);
+        if (!lodash_1.default.isEmpty(result)) {
+            return false;
+        }
+    });
+    return result;
+};
 const scanPages = (page, basepath) => {
     const data = lodash_1.default.toPairs(page);
     const folderList = lodash_1.default.fromPairs(lodash_1.default.reject(data, isFile));
@@ -110,8 +126,6 @@ const scanPages = (page, basepath) => {
     const relativePath = mkPath(["pics/index", basepath, "index.json"]);
     const index = {
         path: originalPath,
-        thumb: mkPath(["pics/resized/360x225", basepath]),
-        full: mkPath(["pics/resized/1200x750", basepath]),
         title: basepath,
         albums: lodash_1.default.map(folderList, (data, key) => {
             return {
@@ -121,6 +135,9 @@ const scanPages = (page, basepath) => {
                 index: mkPath(["pics/index", basepath, key, "index.json"]),
             };
         }),
+        thumb: mkPath(["pics/resized/360x225", basepath]),
+        full: mkPath(["pics/resized/1200x750", basepath]),
+        cover: findFirstImage(fileList, folderList),
         items: lodash_1.default.map(fileList, (data, key) => {
             return {
                 path: mkPath([originalPath, key]),
@@ -141,7 +158,7 @@ const processPage = (page) => {
         item.Type = mime_1.default.getType(lodash_1.default.get(item, 'Key'));
         item.Path = lodash_1.default.split(key, '/');
         // !_.isNull(item.Type) && (item.Path = _.initial(item.Path))
-        item.Valid = isImage(item.Type) || isVideo(item.Type);
+        item.Valid = isImage(item.Type) || isVideo(item.Type) || isAudio(item.Type);
         item.File = !lodash_1.default.isNull(item.Type);
     });
     // keep Valid only

@@ -18,12 +18,17 @@
     </noscript>
 </head>
 <body>
+
 <div id="wrapper">
     <header id="header">
-        <h1><strong class="js-album-title"></strong></h1>
+        <h1>
+            <span><a href="/" class="js-back-url">Parent album &gt;</a></span>
+            <strong class="js-album-title"></strong>
+        </h1>
     </header>
     <div id="main" class="js-picture-list"></div>
 </div>
+
 <script src="assets/js/jquery.min.js"></script>
 <script src="assets/js/lodash.min.js"></script>
 <script src="assets/js/skel.min.js"></script>
@@ -32,35 +37,47 @@
 <!--[if lte IE 8]>
 <script src="assets/js/ie/respond.min.js"></script>
 <![endif]-->
+
 <script>
 
-  var indexUrl = _.defaultTo($.fn.queryParam('i'), '/pics/index/index.json');
-  var $container = $('.js-picture-list');
-  var $title = $('.js-album-title');
+  var defaultIndex = '/pics/index/index.json';
+  var indexUrl     = _.defaultTo($.fn.queryParam('i'), defaultIndex);
+  var hasParent    = !_.isEqual(indexUrl, defaultIndex);
+  var $container   = $('.js-picture-list');
+  var $title       = $('.js-album-title');
+  var $backURL     = $('.js-back-url');
 
-  function mkPath (path) {
-      return _.join(path, "/")
+  function mkPath(path) {
+    if (!_.isArray(path)) path = [path];
+    return _.join(path, "/")
   }
 
-  function basename (path) {
-      return _.last(_.split(path, "/"));
+  function basename(path) {
+    return _.last(_.split(path, "/"));
   }
 
-  $.getJSON(indexUrl)
-    .then(function (response) {
-      console.log(response);
+  $.getJSON(mkPath(indexUrl))
+    .success(function (response) {
+      console.log('response', response);
 
       $container.empty();
 
-      $title.html(_.get(response, 'title', ''));
+      var titleText = _.get(response, 'title', 'This album');
+      console.log('album:', titleText);
+      $title.html(titleText);
 
       var albums = _.get(response, 'albums', []);
-      var items  = _.get(response, 'items', []);
+      var items = _.get(response, 'items', []);
+      console.log(_.size(albums), 'nested albums');
+      console.log(_.size(items), 'items');
+
       if (!_.size(albums) && _.size(items)) {
+        console.log("redirecting to item list", items);
         window.location.href = '/album/index.html?i=' + indexUrl;
         return;
       }
 
+      console.log("displaying album list", albums);
       _.each(albums, function (album) {
         var thumbUrl = mkPath([album.path, album.thumb]);
         $("<article class=\"thumb\">" +
@@ -68,23 +85,55 @@
                 "<img src=\"" + thumbUrl + "\" alt=\"\" />" +
               "</a>" +
               "<h2>" + album.title + "</h2>" +
+              "<span class=\"accessory-icon icon-albums\"></span>" +
           "</article>").appendTo($container);
       });
 
-      var items = _.get(response, 'items', []);
       if (_.size(items)) {
-          var thumbFilename = basename(_.first(items));
-          var thumbUrl = mkPath([response.thumb, thumbFilename]);
+        console.log('appending items list link', items);
+        titleText = _.size(items) + " photos";
+
+        var thumbUrl = _.get(response, 'cover', '');
+        if (_.isEmpty(thumbUrl)) {
+          thumbUrl = "/assets/css/images/missing.png";
+        }
+        var thumbFilename = basename(thumbUrl);
+
         $("<article class=\"thumb\">" +
-              "<a href=\"/album/index.html?i=" + indexUrl + "\" class=\"image\">" +
+              "<a href=\"/album/index.html?i=" + indexUrl + "\" class=\"image\" style=\"background-size: auto;\">" +
                 "<img src=\"" + thumbUrl + "\" alt=\"" + thumbFilename + "\" />" +
               "</a>" +
-              "<h2>" + response.title + "</h2>" +
+              "<h2>" + titleText + "</h2>" +
+              "<span class=\"accessory-icon icon-items\"></span>" +
           "</article>").appendTo($container);
       }
 
+      if (hasParent) {
+        // redirect to album list with parent index
+        var parentUrl = _.join(_.initial(_.initial(_.split(indexUrl, "/"))), "/") + "/index.json"
+        $backURL.attr('href', '/index.html?i=' + parentUrl);
+        console.log("parent url", parentUrl);
+
+        $.getJSON(parentUrl)
+          .success(function (response) {
+            var parentTitleText = _.get(response, 'title', false);
+            if (parentTitleText) {
+              $backURL.html(parentTitleText + " &gt;");
+            }
+          });
+      } else {
+        $backURL.hide();
+      }
+
       initMain();
+    })
+    .fail(function (xhr, err) {
+      console.error(err);
+
+      $container.empty();
+      $title.text(_.get(err, 'message', 'Generic error'));
     });
+
 </script>
 </body>
 </html>

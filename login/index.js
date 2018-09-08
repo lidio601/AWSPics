@@ -3,8 +3,9 @@ const AWS = require('aws-sdk')
 const async = require('async')
 const htpasswd = require('htpasswd-auth')
 const cloudfront = require('aws-cloudfront-sign')
-const {OAuth2Client} = require('google-auth-library');
+const {OAuth2Client} = require('google-auth-library')
 const _ = require('lodash')
+const http = require('http')
 
 // --------------
 // Lambda function parameters, as environment variables
@@ -36,6 +37,36 @@ async function verify (token) {
   console.log('user email', email, allowedUsers)
 
   return _.indexOf(allowedUsers, email) !== -1
+}
+
+function sendNotification (username, cb) {
+  const options = {
+    'method': 'POST',
+    'hostname': 'hook.litosoft.io',
+    'path': '/generic/?k=pz9xR9AcLzQDkK39yh2wA8ZH6a32wbZ6',
+    'headers': {}
+  }
+
+  var req = http.request(options, function (res) {
+    var chunks = []
+
+    res.on('data', function (chunk) {
+      chunks.push(chunk)
+    });
+
+    res.on('end', function () {
+      // var body = Buffer.concat(chunks)
+      // console.log(body.toString())
+      cb();
+    })
+  })
+
+  req.write(JSON.stringify({
+    recipient: 'fabio',
+    text: 'photo: login by ' + username
+  }))
+
+  req.end()
 }
 
 // --------------
@@ -72,12 +103,14 @@ exports.handler = (event, context, callback) => {
       ok.then((authenticated) => {
         if (authenticated) {
           console.log('Successful login for: ' + body.username)
-          var responseHeaders = cookiesHeaders(config)
-          callback(null, {
-            statusCode: 200,
-            body: JSON.stringify(responseHeaders),
-            headers: responseHeaders
-          })
+          sendNotification(body.username, function () {
+            var responseHeaders = cookiesHeaders(config)
+            callback(null, {
+              statusCode: 200,
+              body: JSON.stringify(responseHeaders),
+              headers: responseHeaders
+            })
+          });
         } else {
           console.log('Invalid login for: ' + body.username)
           callback(null, {

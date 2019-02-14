@@ -117,17 +117,17 @@ const makeIndex = (albumPath: string, indexPath: string, index: object): Bluebir
     })
 };
 
-const findFirstImage = (fileList: object, folderList?: object): string => {
+const findFirstImage = (fileList: object, folderList: object, originalPath: string): string => {
     // get the first image from the file list
     const firstImageItem: object = _.first(_.filter(fileList, (item: object): boolean =>
         isImage(_.get(item, 'Type'))));
     if (firstImageItem) {
-        return _.get(firstImageItem, 'Key')
+        return _.replace(_.get(firstImageItem, 'Key'), originalPath + '/', '')
     }
 
     let result :string = '';
     _.each(folderList, (item: object, key: string): boolean => {
-        result = findFirstImage(item);
+        result = findFirstImage(item, {}, originalPath);
         if (!_.isEmpty(result)) {
             return false;
         }
@@ -148,16 +148,20 @@ const scanPages = (page: object, basepath?: string): Bluebird<any> => {
         path: originalPath,
         title: basepath,
         albums: _.map(folderList, (data: object, key: string) => {
+            const data2: object = _.toPairs(data)
+            const folderList2: object = _.fromPairs(_.reject(data2, isFile))
+            const fileList2: object = _.fromPairs(_.filter(data2, isFile))
+
             return {
                 path: mkPath(["pics/resized/360x225", basepath, key]),
                 title: key,
-                thumb: _.first(_.first(_.toPairs(data))),
+                thumb: findFirstImage(fileList2, folderList2, mkPath([originalPath, key])),
                 index: mkPath(["pics/index", basepath, key, "index.json"]),
             }
         }),
         thumb: mkPath(["pics/resized/360x225", basepath]),
         full: mkPath(["pics/resized/1200x750", basepath]),
-        cover: findFirstImage(fileList, folderList),
+        cover: findFirstImage(fileList, folderList, originalPath),
         items: _.map(fileList, (data: object, key: string) => {
             return {
                 path: mkPath([originalPath, key]),
@@ -283,7 +287,7 @@ const emptyBucket = () : Promise<void> => {
     return cycle();
 };
 
-const invalidateCloudFront = (): Bluebird<void> =>
+const invalidateCloudFront = (path: string): Bluebird<void> =>
     new Bluebird((resolve, reject) => {
         cloudfront.listDistributions((err: AWSError, data: any) => {
             // Handle error
@@ -304,7 +308,7 @@ const invalidateCloudFront = (): Bluebird<void> =>
                 InvalidationBatch: {
                     CallerReference: "index-" + Date.now(),
                     Paths: {
-                        Items: ["/*"],
+                        Items: [path],
                         Quantity: 1,
                     },
                 },
@@ -316,9 +320,10 @@ const invalidateCloudFront = (): Bluebird<void> =>
     });
 
 export function handler(event: any, context: any): void {
+    return invalidateCloudFront("/index.html")
     emptyBucket()
         .then(() => processBucket())
-        .then(() => invalidateCloudFront())
+        .then(() => invalidateCloudFront("/pics/index/*"))
         .then(() => context && context.succeed())
         .catch(err => context && context.fail(err))
 }

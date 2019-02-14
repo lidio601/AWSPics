@@ -102,15 +102,15 @@ const makeIndex = (albumPath, indexPath, index) => {
         });
     });
 };
-const findFirstImage = (fileList, folderList) => {
+const findFirstImage = (fileList, folderList, originalPath) => {
     // get the first image from the file list
     const firstImageItem = lodash_1.default.first(lodash_1.default.filter(fileList, (item) => isImage(lodash_1.default.get(item, 'Type'))));
     if (firstImageItem) {
-        return lodash_1.default.get(firstImageItem, 'Key');
+        return lodash_1.default.replace(lodash_1.default.get(firstImageItem, 'Key'), originalPath + '/', '');
     }
     let result = '';
     lodash_1.default.each(folderList, (item, key) => {
-        result = findFirstImage(item);
+        result = findFirstImage(item, {}, originalPath);
         if (!lodash_1.default.isEmpty(result)) {
             return false;
         }
@@ -128,16 +128,19 @@ const scanPages = (page, basepath) => {
         path: originalPath,
         title: basepath,
         albums: lodash_1.default.map(folderList, (data, key) => {
+            const data2 = lodash_1.default.toPairs(data);
+            const folderList2 = lodash_1.default.fromPairs(lodash_1.default.reject(data2, isFile));
+            const fileList2 = lodash_1.default.fromPairs(lodash_1.default.filter(data2, isFile));
             return {
                 path: mkPath(["pics/resized/360x225", basepath, key]),
                 title: key,
-                thumb: lodash_1.default.first(lodash_1.default.first(lodash_1.default.toPairs(data))),
+                thumb: findFirstImage(fileList2, folderList2, mkPath([originalPath, key])),
                 index: mkPath(["pics/index", basepath, key, "index.json"]),
             };
         }),
         thumb: mkPath(["pics/resized/360x225", basepath]),
         full: mkPath(["pics/resized/1200x750", basepath]),
-        cover: findFirstImage(fileList, folderList),
+        cover: findFirstImage(fileList, folderList, originalPath),
         items: lodash_1.default.map(fileList, (data, key) => {
             return {
                 path: mkPath([originalPath, key]),
@@ -248,7 +251,7 @@ const emptyBucket = () => {
     console.log('emptyBucket started');
     return cycle();
 };
-const invalidateCloudFront = () => new bluebird_1.default((resolve, reject) => {
+const invalidateCloudFront = (path) => new bluebird_1.default((resolve, reject) => {
     cloudfront.listDistributions((err, data) => {
         // Handle error
         if (err) {
@@ -266,7 +269,7 @@ const invalidateCloudFront = () => new bluebird_1.default((resolve, reject) => {
             InvalidationBatch: {
                 CallerReference: "index-" + Date.now(),
                 Paths: {
-                    Items: ["/*"],
+                    Items: [path],
                     Quantity: 1,
                 },
             },
@@ -279,9 +282,10 @@ const invalidateCloudFront = () => new bluebird_1.default((resolve, reject) => {
     });
 });
 function handler(event, context) {
+    return invalidateCloudFront("/index.html");
     emptyBucket()
         .then(() => processBucket())
-        .then(() => invalidateCloudFront())
+        .then(() => invalidateCloudFront("/pics/index/*"))
         .then(() => context && context.succeed())
         .catch(err => context && context.fail(err));
 }
